@@ -28,8 +28,8 @@ Autotools files should be regenerated as part of this work.
 
 ## Implementation order
 
-1. Add an engine adapter that owns the existing GNU Backgammon state behind
-   `gnubg_native`.
+1. Separate the upstream process-oriented initialization from the reusable
+   engine state, then add an adapter that owns it behind `gnubg_native`.
 2. Move board updates and user-visible messages to callbacks/snapshots.
 3. Build a C smoke test without GTK.
 4. Add a Swift Package/Xcode target for macOS arm64.
@@ -37,3 +37,8 @@ Autotools files should be regenerated as part of this work.
 
 The ABI is intentionally C-compatible so Swift can import it directly and
 so the macOS and iOS targets cannot accidentally grow different game rules.
+
+The adapter is intentionally not a stub yet: GNU Backgammon currently keeps
+the match state and initialization in process-wide globals owned by its CLI
+entry point. The next engine change must make that lifecycle explicit before
+the C ABI can safely promise independent handles or iOS use.

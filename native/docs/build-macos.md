@@ -1,15 +1,14 @@
 # GTK-free engine smoke test on Apple silicon
 
 The pinned upstream tree can be configured without GTK, Python, SQLite, and
-the 3D board:
+the 3D board with the repository build script:
 
 ```sh
-cd Vendor/gnubg
-./autogen.sh
-./configure --with-gtk=no --with-board3d=no --with-python=no --with-sqlite=no
-make -j4
-./gnubg --version
+native/scripts/build-engine-macos.sh
 ```
+
+Use `GNUBG_BUILD_JOBS=4` to limit parallelism. The script checks that the
+result is an arm64 Mach-O executable and runs `gnubg --version`.
 
 The current upstream checkout requires GNU Bison 3.x to regenerate
 `sgf_y.c` and `external_y.c`. The macOS Command Line Tools provide an older
