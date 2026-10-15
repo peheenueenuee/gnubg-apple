@@ -82,7 +82,8 @@ typedef struct {
     void *context;
 } gnubg_native_callbacks;
 
-/* The returned handle owns all engine state and is not thread-safe. */
+/* The returned handle owns the active engine view and is not thread-safe.
+ * The current upstream integration permits one active handle per process. */
 gnubg_native *gnubg_native_create(gnubg_native_variation variation,
                                    const gnubg_native_callbacks *callbacks);
 void gnubg_native_destroy(gnubg_native *engine);

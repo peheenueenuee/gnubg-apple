@@ -1,0 +1,270 @@
+/*
+ * First native engine adapter.
+ *
+ * GNU Backgammon's current upstream entry point owns the engine state in
+ * process-wide globals.  Until that is refactored upstream, this translation
+ * unit deliberately exposes one active handle only.  It gives the Apple
+ * front end a real lifecycle and snapshot boundary without pretending that
+ * the old global state is already re-entrant.
+ */
+
+#include "../include/gnubg_native.h"
+
+/* Keep the upstream CLI entry point out of the native target.  Including the
+ * source here is temporary integration glue; the eventual target will use a
+ * small upstream core library after initialization is extracted there. */
+#ifndef LOCALEDIR
+#define LOCALEDIR "."
+#endif
+#define main gnubg_cli_main
+#include "../../Vendor/gnubg/gnubg.c"
+#undef main
+
+#include <string.h>
+
+struct gnubg_native {
+    gnubg_native_callbacks callbacks;
+};
+
+static gnubg_native *active_engine;
+static int engine_initialized;
+
+static int
+native_checkers(bgvariation variation)
+{
+    switch (variation) {
+    case VARIATION_HYPERGAMMON_1:
+        return 3;
+    case VARIATION_HYPERGAMMON_2:
+        return 4;
+    case VARIATION_HYPERGAMMON_3:
+        return 5;
+    default:
+        return 15;
+    }
+}
+
+static void
+native_message(const gnubg_native *engine, const char *message)
+{
+    if (engine && engine->callbacks.message)
+        engine->callbacks.message(engine->callbacks.context, message);
+}
+
+static gnubg_native_result
+native_bootstrap(const gnubg_native *engine)
+{
+    char *met;
+
+    if (engine_initialized)
+        return GNUBG_NATIVE_OK;
+
+    default_import_folder = g_strdup(".");
+    default_export_folder = g_strdup(".");
+    default_sgf_folder = g_strdup(".");
+
+    output_initialize();
+    init_defaults();
+    DefaultDBSettings();
+
+    /* Desktop builds use the Autotools data directory. Apple targets pass
+     * their app bundle or resource directory explicitly. */
+    {
+        const gchar *data_dir = g_getenv("GNUBG_NATIVE_DATA_DIR");
+        if (data_dir && *data_dir)
+            pkg_datadir = g_strdup(data_dir);
+    }
+
+    /* The Apple UI owns rendering, progress, preferences, and sound. */
+    fInteractive = FALSE;
+    fShowProgress = FALSE;
+    fDisplay = FALSE;
+    fQuiet = TRUE;
+    fAutoMove = FALSE;
+    fAutoRoll = FALSE;
+
+    init_rng();
+
+    met = BuildFilename2("met", "Kazaross-XG2.xml");
+    if (!g_file_test(met, G_FILE_TEST_EXISTS)) {
+        g_free(met);
+        native_message(engine, "GNU Backgammon match equity table is missing");
+        return GNUBG_NATIVE_ENGINE_ERROR;
+    }
+    InitMatchEquity(met);
+    g_free(met);
+
+    init_nets(FALSE);
+    MT_InitThreads();
+#if defined(USE_MULTITHREAD)
+    MT_StartThreads();
+#endif
+    SetExitSoundOff();
+
+    engine_initialized = TRUE;
+    return GNUBG_NATIVE_OK;
+}
+
+static void
+native_snapshot_position(gnubg_native_position *position)
+{
+    int player;
+    int point;
+
+    memset(position, 0, sizeof(*position));
+    for (player = 0; player < 2; player++) {
+        unsigned int occupied = ms.anBoard[player][24];
+
+        position->bar[player] = (uint8_t) occupied;
+        for (point = 0; point < 24; point++) {
+            position->points[player][point] = (uint8_t) ms.anBoard[player][point];
+            occupied += ms.anBoard[player][point];
+        }
+        position->borne_off[player] = (uint8_t) MAX(0, native_checkers(ms.bgv) - (int) occupied);
+        position->score[player] = (uint32_t) MAX(0, ms.anScore[player]);
+    }
+
+    position->dice[0] = (uint8_t) ms.anDice[0];
+    position->dice[1] = (uint8_t) ms.anDice[1];
+    position->turn = (int8_t) ms.fTurn;
+    position->cube_owner = (int8_t) ms.fCubeOwner;
+    position->cube_value = (uint16_t) ms.nCube;
+    position->doubled = (uint8_t) ms.fDoubled;
+    position->game_over = (uint8_t) (ms.gs != GAME_PLAYING);
+    position->match_length = (uint32_t) MAX(0, ms.nMatchTo);
+}
+
+gnubg_native *
+gnubg_native_create(gnubg_native_variation variation,
+                    const gnubg_native_callbacks *callbacks)
+{
+    gnubg_native *engine;
+
+    if (active_engine)
+        return NULL;
+
+    engine = g_new0(gnubg_native, 1);
+    if (callbacks)
+        engine->callbacks = *callbacks;
+
+    bgvDefault = (bgvariation) variation;
+    if (native_bootstrap(engine) != GNUBG_NATIVE_OK) {
+        g_free(engine);
+        return NULL;
+    }
+
+    active_engine = engine;
+    return engine;
+}
+
+void
+gnubg_native_destroy(gnubg_native *engine)
+{
+    if (!engine || engine != active_engine)
+        return;
+
+    Shutdown();
+    active_engine = NULL;
+    engine_initialized = FALSE;
+    g_free(engine);
+}
+
+gnubg_native_result
+gnubg_native_start_match(gnubg_native *engine,
+                         uint32_t match_length,
+                         gnubg_native_player player0,
+                         gnubg_native_player player1)
+{
+    char length[32];
+
+    if (!engine || engine != active_engine)
+        return GNUBG_NATIVE_INVALID_ARGUMENT;
+    if (!match_length || match_length > MAXSCORE)
+        return GNUBG_NATIVE_INVALID_ARGUMENT;
+
+    ap[0].pt = player0 == GNUBG_NATIVE_COMPUTER ? PLAYER_GNU : PLAYER_HUMAN;
+    ap[1].pt = player1 == GNUBG_NATIVE_COMPUTER ? PLAYER_GNU : PLAYER_HUMAN;
+    snprintf(length, sizeof(length), "%u", match_length);
+    outputoff();
+    CommandNewMatch(length);
+    outputon();
+    return ms.gs == GAME_PLAYING ? GNUBG_NATIVE_OK : GNUBG_NATIVE_ENGINE_ERROR;
+}
+
+gnubg_native_result
+gnubg_native_roll(gnubg_native *engine)
+{
+    if (!engine || engine != active_engine)
+        return GNUBG_NATIVE_INVALID_ARGUMENT;
+    if (ms.gs != GAME_PLAYING)
+        return GNUBG_NATIVE_NOT_READY;
+
+    outputoff();
+    CommandRoll(NULL);
+    outputon();
+    return ms.anDice[0] ? GNUBG_NATIVE_OK : GNUBG_NATIVE_ENGINE_ERROR;
+}
+
+gnubg_native_result
+gnubg_native_play(gnubg_native *engine, const gnubg_native_move *move)
+{
+    (void) move;
+    if (!engine || engine != active_engine)
+        return GNUBG_NATIVE_INVALID_ARGUMENT;
+    return GNUBG_NATIVE_NOT_READY;
+}
+
+gnubg_native_result
+gnubg_native_hint(gnubg_native *engine, gnubg_native_move *move)
+{
+    (void) move;
+    if (!engine || engine != active_engine)
+        return GNUBG_NATIVE_INVALID_ARGUMENT;
+    return GNUBG_NATIVE_NOT_READY;
+}
+
+gnubg_native_result
+gnubg_native_analyse(gnubg_native *engine,
+                     const gnubg_native_analysis_settings *settings)
+{
+    (void) settings;
+    if (!engine || engine != active_engine)
+        return GNUBG_NATIVE_INVALID_ARGUMENT;
+    return GNUBG_NATIVE_NOT_READY;
+}
+
+gnubg_native_result
+gnubg_native_snapshot(const gnubg_native *engine,
+                      gnubg_native_position *position)
+{
+    if (!engine || engine != active_engine || !position)
+        return GNUBG_NATIVE_INVALID_ARGUMENT;
+
+    native_snapshot_position(position);
+    return GNUBG_NATIVE_OK;
+}
+
+const char *
+gnubg_native_result_string(gnubg_native_result result)
+{
+    switch (result) {
+    case GNUBG_NATIVE_OK:
+        return "ok";
+    case GNUBG_NATIVE_INVALID_ARGUMENT:
+        return "invalid argument";
+    case GNUBG_NATIVE_NOT_READY:
+        return "not ready";
+    case GNUBG_NATIVE_ILLEGAL_MOVE:
+        return "illegal move";
+    case GNUBG_NATIVE_ENGINE_ERROR:
+        return "engine error";
+    default:
+        return "unknown result";
+    }
+}
+
+const char *
+gnubg_native_version(void)
+{
+    return PACKAGE_VERSION;
+}

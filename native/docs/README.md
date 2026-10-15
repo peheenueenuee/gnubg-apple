@@ -38,7 +38,9 @@ Autotools files should be regenerated as part of this work.
 The ABI is intentionally C-compatible so Swift can import it directly and
 so the macOS and iOS targets cannot accidentally grow different game rules.
 
-The adapter is intentionally not a stub yet: GNU Backgammon currently keeps
-the match state and initialization in process-wide globals owned by its CLI
-entry point. The next engine change must make that lifecycle explicit before
-the C ABI can safely promise independent handles or iOS use.
+The first adapter keeps the existing engine state process-wide and therefore
+allows one active handle at a time. Match start, dice rolling, and immutable
+snapshots are wired through to the real engine; move input and analysis remain
+explicitly `GNUBG_NATIVE_NOT_READY` until their coordinate and callback
+contracts are implemented. This limitation is deliberate while the upstream
+initialization lifecycle is being extracted.
