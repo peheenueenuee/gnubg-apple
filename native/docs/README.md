@@ -43,6 +43,7 @@ allows one active handle at a time. Match start, dice rolling, immutable
 snapshots, hint generation, and legal move application are wired through to
 the real engine. Move coordinates use GNUbg's engine points directly: `0..23`
 for points, `24` for the bar, and `-1` for borne off. Analysis remains
-explicitly `GNUBG_NATIVE_NOT_READY` until its callback contract is
-implemented. This limitation is deliberate while the upstream initialization
-lifecycle is being extracted.
+available as a synchronous normal evaluation callback. Its seven outputs use
+the constants in `gnubg_native.h`; rollout trials remain reserved for the
+next analysis iteration. This limitation is deliberate while the upstream
+initialization lifecycle is being extracted.

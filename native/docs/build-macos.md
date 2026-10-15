@@ -17,9 +17,10 @@ native/scripts/build-native-smoke-macos.sh
 ```
 
 This currently validates one real engine handle, starting a one-point match,
-rolling, obtaining a hint, applying that legal move, and taking a position
-snapshot. It is intentionally a single-handle smoke test while upstream's
-process-global initialization is being separated.
+rolling, obtaining a hint, applying that legal move, running a normal
+evaluation callback, and taking a position snapshot. It is intentionally a
+single-handle smoke test while upstream's process-global initialization is
+being separated.
 
 The current upstream checkout requires GNU Bison 3.x to regenerate
 `sgf_y.c` and `external_y.c`. The macOS Command Line Tools provide an older

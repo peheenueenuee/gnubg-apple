@@ -35,5 +35,7 @@ The platform-neutral C boundary is defined in
 single-handle adapter now starts the real engine, creates a match, and
 returns immutable position snapshots. It also rolls, obtains a real GNUbg
 hint, validates a move against GNUbg's legal move list, and applies it. The
-next step is analysis callbacks, followed by extracting the upstream
-initialization so multiple app-owned handles are possible.
+It can also return a synchronous normal evaluation through a C callback. The
+next step is rollout analysis and cancellation/progress handling, followed by
+extracting the upstream initialization so multiple app-owned handles are
+possible.

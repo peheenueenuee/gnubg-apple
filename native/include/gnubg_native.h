@@ -20,6 +20,17 @@ extern "C" {
 
 #define GNUBG_NATIVE_API_VERSION 1
 #define GNUBG_NATIVE_MAX_MOVES 64
+#define GNUBG_NATIVE_ANALYSIS_OUTPUTS 7
+
+enum {
+    GNUBG_NATIVE_ANALYSIS_WIN = 0,
+    GNUBG_NATIVE_ANALYSIS_WIN_GAMMON = 1,
+    GNUBG_NATIVE_ANALYSIS_WIN_BACKGAMMON = 2,
+    GNUBG_NATIVE_ANALYSIS_LOSE_GAMMON = 3,
+    GNUBG_NATIVE_ANALYSIS_LOSE_BACKGAMMON = 4,
+    GNUBG_NATIVE_ANALYSIS_EQUITY = 5,
+    GNUBG_NATIVE_ANALYSIS_CUBEFUL_EQUITY = 6
+};
 
 typedef struct gnubg_native gnubg_native;
 
@@ -72,14 +83,23 @@ typedef struct {
 } gnubg_native_move;
 
 typedef struct {
+    /* trials is reserved for rollout analysis; 0 requests a normal eval. */
     uint32_t trials;
     uint8_t plies;
     uint8_t deterministic;
 } gnubg_native_analysis_settings;
 
 typedef struct {
+    int8_t player;
+    uint8_t plies;
+    /* Indexed by GNUBG_NATIVE_ANALYSIS_* constants above. */
+    float outputs[GNUBG_NATIVE_ANALYSIS_OUTPUTS];
+} gnubg_native_analysis;
+
+typedef struct {
     void (*message)(void *context, const char *message);
     void (*progress)(void *context, uint32_t completed, uint32_t total);
+    void (*analysis)(void *context, const gnubg_native_analysis *analysis);
     void *context;
 } gnubg_native_callbacks;
 

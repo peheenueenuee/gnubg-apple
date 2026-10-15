@@ -304,10 +304,48 @@ gnubg_native_result
 gnubg_native_analyse(gnubg_native *engine,
                      const gnubg_native_analysis_settings *settings)
 {
-    (void) settings;
+    decisionData decision;
+    cubeinfo cube;
+    evalcontext evaluation;
+    gnubg_native_analysis result;
+    int plies;
+
     if (!engine || engine != active_engine)
         return GNUBG_NATIVE_INVALID_ARGUMENT;
-    return GNUBG_NATIVE_NOT_READY;
+    if (!settings || settings->plies > MAX_FILTER_PLIES)
+        return GNUBG_NATIVE_INVALID_ARGUMENT;
+    if (settings->trials)
+        return GNUBG_NATIVE_NOT_READY;
+    if (ms.gs != GAME_PLAYING)
+        return GNUBG_NATIVE_NOT_READY;
+
+    GetMatchStateCubeInfo(&cube, &ms);
+    evaluation = GetEvalChequer()->ec;
+    plies = settings->plies;
+    evaluation.nPlies = (unsigned int) plies;
+    evaluation.fUsePrune = plies > 0;
+    evaluation.fDeterministic = settings->deterministic != 0;
+    memset(&decision, 0, sizeof(decision));
+    decision.pboard = msBoard();
+    decision.pci = &cube;
+    decision.pec = &evaluation;
+
+    outputoff();
+    if (RunAsyncProcess((AsyncFun) asyncMoveDecisionE, &decision,
+                        _("Analysing position...")) != 0 || MT_SafeGet(&fInterrupt)) {
+        outputon();
+        ResetInterrupt();
+        return GNUBG_NATIVE_ENGINE_ERROR;
+    }
+    outputon();
+
+    memset(&result, 0, sizeof(result));
+    result.player = (int8_t) ms.fTurn;
+    result.plies = (uint8_t) plies;
+    memcpy(result.outputs, decision.aarOutput[0], sizeof(result.outputs));
+    if (engine->callbacks.analysis)
+        engine->callbacks.analysis(engine->callbacks.context, &result);
+    return GNUBG_NATIVE_OK;
 }
 
 gnubg_native_result
