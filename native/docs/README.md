@@ -39,8 +39,10 @@ The ABI is intentionally C-compatible so Swift can import it directly and
 so the macOS and iOS targets cannot accidentally grow different game rules.
 
 The first adapter keeps the existing engine state process-wide and therefore
-allows one active handle at a time. Match start, dice rolling, and immutable
-snapshots are wired through to the real engine; move input and analysis remain
-explicitly `GNUBG_NATIVE_NOT_READY` until their coordinate and callback
-contracts are implemented. This limitation is deliberate while the upstream
-initialization lifecycle is being extracted.
+allows one active handle at a time. Match start, dice rolling, immutable
+snapshots, hint generation, and legal move application are wired through to
+the real engine. Move coordinates use GNUbg's engine points directly: `0..23`
+for points, `24` for the bar, and `-1` for borne off. Analysis remains
+explicitly `GNUBG_NATIVE_NOT_READY` until its callback contract is
+implemented. This limitation is deliberate while the upstream initialization
+lifecycle is being extracted.

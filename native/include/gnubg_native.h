@@ -61,6 +61,7 @@ typedef struct {
 } gnubg_native_position;
 
 typedef struct {
+    /* Engine coordinates: points 0..23, bar 24, borne off -1. */
     int8_t from;
     int8_t to;
 } gnubg_native_step;

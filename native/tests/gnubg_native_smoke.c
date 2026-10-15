@@ -18,6 +18,7 @@ main(void)
         .context = NULL
     };
     gnubg_native_position position;
+    gnubg_native_move move;
     gnubg_native *engine;
     unsigned int checkers[2] = {0, 0};
     unsigned int player;
@@ -45,6 +46,18 @@ main(void)
     printf("turn=%d match_length=%u cube=%u checkers=%u/%u\n",
            position.turn, position.match_length, position.cube_value,
            checkers[0], checkers[1]);
+
+    if (gnubg_native_roll(engine) != GNUBG_NATIVE_OK)
+        return 4;
+    if (gnubg_native_hint(engine, &move) != GNUBG_NATIVE_OK)
+        return 5;
+    if (gnubg_native_play(engine, &move) != GNUBG_NATIVE_OK)
+        return 6;
+    if (gnubg_native_snapshot(engine, &position) != GNUBG_NATIVE_OK ||
+        position.dice[0] || position.dice[1])
+        return 7;
+
+    printf("played_steps=%u next_turn=%d\n", move.step_count, position.turn);
 
     gnubg_native_destroy(engine);
     return 0;

@@ -29,6 +29,32 @@ struct gnubg_native {
 static gnubg_native *active_engine;
 static int engine_initialized;
 
+typedef struct {
+    gnubg_native_move *move;
+    int found;
+} native_hint_context;
+
+static int
+native_hint_record(procrecorddata *record)
+{
+    native_hint_context *context = record->pvUserData;
+    movelist *moves = record->avOutputData[PROCREC_HINT_ARGOUT_MOVELIST];
+    int index = (int) (ptrdiff_t) record->avOutputData[PROCREC_HINT_ARGOUT_INDEX];
+    int step;
+
+    if (!context || !moves || index < 0 || (unsigned int) index >= moves->cMoves)
+        return FALSE;
+
+    context->move->step_count = 0;
+    for (step = 0; step < 4 && moves->amMoves[index].anMove[step * 2] >= 0; step++) {
+        context->move->steps[step].from = (int8_t) moves->amMoves[index].anMove[step * 2];
+        context->move->steps[step].to = (int8_t) moves->amMoves[index].anMove[step * 2 + 1];
+        context->move->step_count++;
+    }
+    context->found = context->move->step_count > 0;
+    return FALSE;
+}
+
 static int
 native_checkers(bgvariation variation)
 {
@@ -208,19 +234,70 @@ gnubg_native_roll(gnubg_native *engine)
 gnubg_native_result
 gnubg_native_play(gnubg_native *engine, const gnubg_native_move *move)
 {
-    (void) move;
+    TanBoard next_board;
+    movelist legal_moves;
+    int engine_move[8];
+    int step;
+    char formatted[FORMATEDMOVESIZE];
+
     if (!engine || engine != active_engine)
         return GNUBG_NATIVE_INVALID_ARGUMENT;
-    return GNUBG_NATIVE_NOT_READY;
+    if (!move || move->step_count == 0 || move->step_count > 4)
+        return GNUBG_NATIVE_INVALID_ARGUMENT;
+    if (ms.gs != GAME_PLAYING || !ms.anDice[0])
+        return GNUBG_NATIVE_NOT_READY;
+
+    for (step = 0; step < 8; step++)
+        engine_move[step] = -1;
+    for (step = 0; step < move->step_count; step++) {
+        int from = move->steps[step].from;
+        int to = move->steps[step].to;
+        if (from < 0 || from > 24 || to < -1 || to > 23 || from == to)
+            return GNUBG_NATIVE_INVALID_ARGUMENT;
+        engine_move[step * 2] = from;
+        engine_move[step * 2 + 1] = to;
+    }
+
+    memcpy(next_board, ms.anBoard, sizeof(next_board));
+    ApplyMove(next_board, engine_move, FALSE);
+    GenerateMoves(&legal_moves, msBoard(), ms.anDice[0], ms.anDice[1], FALSE);
+    if (!board_in_list(&legal_moves, ms.anBoard, (ConstTanBoard) next_board, engine_move))
+        return GNUBG_NATIVE_ILLEGAL_MOVE;
+
+    FormatMove(formatted, ms.anBoard, engine_move);
+    outputoff();
+    CommandMove(formatted);
+    outputon();
+    return ms.anDice[0] ? GNUBG_NATIVE_ENGINE_ERROR : GNUBG_NATIVE_OK;
 }
 
 gnubg_native_result
 gnubg_native_hint(gnubg_native *engine, gnubg_native_move *move)
 {
-    (void) move;
+    native_hint_context context;
+    procrecorddata record;
+    char max_moves[] = "1";
+
     if (!engine || engine != active_engine)
         return GNUBG_NATIVE_INVALID_ARGUMENT;
-    return GNUBG_NATIVE_NOT_READY;
+    if (!move)
+        return GNUBG_NATIVE_INVALID_ARGUMENT;
+    if (ms.gs != GAME_PLAYING || !ms.anDice[0])
+        return GNUBG_NATIVE_NOT_READY;
+
+    memset(move, 0, sizeof(*move));
+    memset(&context, 0, sizeof(context));
+    memset(&record, 0, sizeof(record));
+    context.move = move;
+    record.pfProcessRecord = native_hint_record;
+    record.pvUserData = &context;
+    record.avInputData[PROCREC_HINT_ARGIN_SHOWPROGRESS] = NULL;
+    record.avInputData[PROCREC_HINT_ARGIN_MAXMOVES] = (void *) (ptrdiff_t) 1;
+
+    outputoff();
+    hint_move(max_moves, FALSE, &record);
+    outputon();
+    return context.found ? GNUBG_NATIVE_OK : GNUBG_NATIVE_ENGINE_ERROR;
 }
 
 gnubg_native_result

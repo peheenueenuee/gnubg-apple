@@ -33,6 +33,7 @@ modifying the engine must comply with that license.
 The platform-neutral C boundary is defined in
 [`native/include/gnubg_native.h`](native/include/gnubg_native.h). A first
 single-handle adapter now starts the real engine, creates a match, and
-returns immutable position snapshots. The next step is move input and
-analysis callbacks, followed by extracting the upstream initialization so
-multiple app-owned handles are possible.
+returns immutable position snapshots. It also rolls, obtains a real GNUbg
+hint, validates a move against GNUbg's legal move list, and applies it. The
+next step is analysis callbacks, followed by extracting the upstream
+initialization so multiple app-owned handles are possible.
