@@ -1,0 +1,3 @@
+[submodule "Vendor/gnubg"]
+	path = Vendor/gnubg
+	url = git://git.git.savannah.gnu.org/gnubg.git
