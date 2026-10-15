@@ -56,8 +56,9 @@ typedef enum {
 } gnubg_native_player;
 
 typedef struct {
-    /* The engine stores 24 points plus a bar at index 24 for each player.
-     * Borne-off checkers are represented explicitly for UI consumers. */
+    /* Player indices are fixed identities, shared with score and turn.
+     * Each player uses their own coordinates: point 23 toward point 0.
+     * The adapter maps the engine's rotating board to these identities. */
     uint8_t points[2][24];
     uint8_t bar[2];
     uint8_t borne_off[2];
@@ -104,7 +105,9 @@ typedef struct {
 } gnubg_native_callbacks;
 
 /* The returned handle owns the active engine view and is not thread-safe.
- * The current upstream integration permits one active handle per process. */
+ * The current upstream integration permits one active handle per process.
+ * Destroy releases the match; evaluation resources remain process-owned and
+ * are reused by later handles. Callbacks must not reenter or destroy a handle. */
 gnubg_native *gnubg_native_create(gnubg_native_variation variation,
                                    const gnubg_native_callbacks *callbacks);
 void gnubg_native_destroy(gnubg_native *engine);
@@ -113,6 +116,8 @@ gnubg_native_result gnubg_native_start_match(gnubg_native *engine,
                                              uint32_t match_length,
                                              gnubg_native_player player0,
                                              gnubg_native_player player1);
+/* OK also includes a forced pass. Rolling twice or on a computer turn
+ * returns NOT_READY; computer turn execution is not implemented yet. */
 gnubg_native_result gnubg_native_roll(gnubg_native *engine);
 gnubg_native_result gnubg_native_play(gnubg_native *engine,
                                       const gnubg_native_move *move);

@@ -60,11 +60,11 @@ native_checkers(bgvariation variation)
 {
     switch (variation) {
     case VARIATION_HYPERGAMMON_1:
-        return 3;
+        return 1;
     case VARIATION_HYPERGAMMON_2:
-        return 4;
+        return 2;
     case VARIATION_HYPERGAMMON_3:
-        return 5;
+        return 3;
     default:
         return 15;
     }
@@ -108,6 +108,8 @@ native_bootstrap(const gnubg_native *engine)
     fQuiet = TRUE;
     fAutoMove = FALSE;
     fAutoRoll = FALSE;
+    fAutoBearoff = FALSE;
+    fAutoGame = FALSE;
 
     init_rng();
 
@@ -139,12 +141,14 @@ native_snapshot_position(gnubg_native_position *position)
 
     memset(position, 0, sizeof(*position));
     for (player = 0; player < 2; player++) {
-        unsigned int occupied = ms.anBoard[player][24];
+        /* Board side 1 belongs to fMove, even during cube decisions. */
+        int side = ms.fMove < 0 ? player : (player == ms.fMove ? 1 : 0);
+        unsigned int occupied = ms.anBoard[side][24];
 
         position->bar[player] = (uint8_t) occupied;
         for (point = 0; point < 24; point++) {
-            position->points[player][point] = (uint8_t) ms.anBoard[player][point];
-            occupied += ms.anBoard[player][point];
+            position->points[player][point] = (uint8_t) ms.anBoard[side][point];
+            occupied += ms.anBoard[side][point];
         }
         position->borne_off[player] = (uint8_t) MAX(0, native_checkers(ms.bgv) - (int) occupied);
         position->score[player] = (uint32_t) MAX(0, ms.anScore[player]);
@@ -166,7 +170,8 @@ gnubg_native_create(gnubg_native_variation variation,
 {
     gnubg_native *engine;
 
-    if (active_engine)
+    if (active_engine || variation < GNUBG_NATIVE_STANDARD ||
+        variation > GNUBG_NATIVE_HYPERGAMMON_3)
         return NULL;
 
     engine = g_new0(gnubg_native, 1);
@@ -189,9 +194,15 @@ gnubg_native_destroy(gnubg_native *engine)
     if (!engine || engine != active_engine)
         return;
 
-    Shutdown();
+    /* Upstream Shutdown is terminal: bearoff globals retain freed pointers.
+     * Keep evaluation resources alive for the process and release only the
+     * match here, so subsequent handles can safely reuse initialization. */
+    FreeMatch();
+    ClearMatch();
+    ms.gs = GAME_NONE;
+    ms.fMove = ms.fTurn = -1;
+    ms.anDice[0] = ms.anDice[1] = 0;
     active_engine = NULL;
-    engine_initialized = FALSE;
     g_free(engine);
 }
 
@@ -205,7 +216,9 @@ gnubg_native_start_match(gnubg_native *engine,
 
     if (!engine || engine != active_engine)
         return GNUBG_NATIVE_INVALID_ARGUMENT;
-    if (!match_length || match_length > MAXSCORE)
+    if ((player0 != GNUBG_NATIVE_HUMAN && player0 != GNUBG_NATIVE_COMPUTER) ||
+        (player1 != GNUBG_NATIVE_HUMAN && player1 != GNUBG_NATIVE_COMPUTER) ||
+        !match_length || match_length > MAXSCORE)
         return GNUBG_NATIVE_INVALID_ARGUMENT;
 
     ap[0].pt = player0 == GNUBG_NATIVE_COMPUTER ? PLAYER_GNU : PLAYER_HUMAN;
@@ -220,15 +233,23 @@ gnubg_native_start_match(gnubg_native *engine,
 gnubg_native_result
 gnubg_native_roll(gnubg_native *engine)
 {
+    int previous_turn;
+
     if (!engine || engine != active_engine)
         return GNUBG_NATIVE_INVALID_ARGUMENT;
     if (ms.gs != GAME_PLAYING)
         return GNUBG_NATIVE_NOT_READY;
 
+    if (ms.anDice[0] || ms.fDoubled || ms.fResigned ||
+        ap[ms.fTurn].pt != PLAYER_HUMAN)
+        return GNUBG_NATIVE_NOT_READY;
+
+    previous_turn = ms.fTurn;
     outputoff();
     CommandRoll(NULL);
     outputon();
-    return ms.anDice[0] ? GNUBG_NATIVE_OK : GNUBG_NATIVE_ENGINE_ERROR;
+    return ms.anDice[0] || ms.fTurn != previous_turn || ms.gs != GAME_PLAYING
+        ? GNUBG_NATIVE_OK : GNUBG_NATIVE_ENGINE_ERROR;
 }
 
 gnubg_native_result
@@ -259,7 +280,8 @@ gnubg_native_play(gnubg_native *engine, const gnubg_native_move *move)
     }
 
     memcpy(next_board, ms.anBoard, sizeof(next_board));
-    ApplyMove(next_board, engine_move, FALSE);
+    if (ApplyMove(next_board, engine_move, FALSE) < 0)
+        return GNUBG_NATIVE_ILLEGAL_MOVE;
     GenerateMoves(&legal_moves, msBoard(), ms.anDice[0], ms.anDice[1], FALSE);
     if (!board_in_list(&legal_moves, ms.anBoard, (ConstTanBoard) next_board, engine_move))
         return GNUBG_NATIVE_ILLEGAL_MOVE;

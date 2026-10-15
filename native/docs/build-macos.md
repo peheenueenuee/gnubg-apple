@@ -28,3 +28,8 @@ Bison, so a clean checkout must either use a newer Bison in `PATH` or use the
 versioned generated parser sources supplied by the engine build environment.
 Do not treat a successful `make` as sufficient: the arm64 executable must also
 pass `./gnubg --version`.
+
+The script also runs internal regression fixtures for handle recreation, all
+five variation checker counts, fixed player identities, rejection of a legal
+move prefix followed by an invalid step, forced passes, and roll preconditions.
+These fixtures use engine internals without exposing test hooks in the C ABI.

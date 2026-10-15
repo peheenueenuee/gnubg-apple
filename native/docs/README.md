@@ -47,3 +47,14 @@ available as a synchronous normal evaluation callback. Its seven outputs use
 the constants in `gnubg_native.h`; rollout trials remain reserved for the
 next analysis iteration. This limitation is deliberate while the upstream
 initialization lifecycle is being extracted.
+
+Position arrays use fixed player identities, matching `score`; each player's
+points run from 23 toward 0. This differs from the upstream rotating board.
+A successful roll can include a forced pass; clients should read a fresh
+snapshot. Repeated rolls and computer turns return `NOT_READY`.
+
+Destroy frees the match, while evaluation resources and worker infrastructure
+remain initialized for the process lifetime. The single active handle can be
+recreated. All calls must be serialized, and callbacks must not reenter or
+destroy the handle. Computer execution, cube decisions, and rollout progress
+and cancellation are not yet exposed.

@@ -40,3 +40,15 @@ cc "$tmp_dir/gnubg_native.o" "$tmp_dir/gnubg_native_smoke.o" "$@" \
     -o "$tmp_dir/gnubg-native-smoke"
 
 GNUBG_NATIVE_DATA_DIR="$engine_dir" "$tmp_dir/gnubg-native-smoke"
+
+# Internal fixtures exercise states unreachable through the current public API.
+# shellcheck disable=SC2086
+cc -std=gnu23 $common_flags $pkg_cflags \
+    -c native/tests/gnubg_native_regression.c -o "$tmp_dir/regression.o"
+# shellcheck disable=SC2086
+cc "$tmp_dir/regression.o" "$@" \
+    "$engine_dir/lib/.libs/libevent.a" "$engine_dir/lib/.libs/libsimd.a" \
+    -framework AudioUnit -framework CoreServices -framework AudioToolbox \
+    -framework CoreAudio $pkg_libs -lreadline -lncurses -lm \
+    -o "$tmp_dir/gnubg-native-regression"
+GNUBG_NATIVE_DATA_DIR="$engine_dir" "$tmp_dir/gnubg-native-regression"

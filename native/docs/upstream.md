@@ -8,17 +8,15 @@ upstream commit: 0143cad3
 upstream tree:   /Users/y-shirai/Nopaid/bg/gnubg
 ```
 
-The upstream source is kept separate from this application repository. Before
-the first distributable build, import it under `Vendor/gnubg` as a pinned
-source snapshot or a reproducible subtree commit. `Vendor/gnubg` is ignored
-until that import is deliberate, so a local Autotools build cannot get
-accidentally committed.
+The engine is pinned as the `Vendor/gnubg` Git submodule at the commit above.
+Initialize it with `git submodule update --init`. Build products remain inside
+that upstream checkout and are not application source changes.
 
 ## Update procedure
 
 1. Fetch the upstream repository.
 2. Review the new commit and its license/build requirements.
-3. Update the pinned source snapshot.
+3. Update the submodule commit.
 4. Build the GTK-free adapter and run the native smoke test on arm64 macOS.
 5. Record the upstream commit in this file and in the application changelog.
 

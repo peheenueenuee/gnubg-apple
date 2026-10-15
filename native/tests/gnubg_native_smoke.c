@@ -35,7 +35,6 @@ main(void)
     unsigned int checkers[2] = {0, 0};
     unsigned int player;
     unsigned int point;
-    unsigned int attempts;
     gnubg_native_result roll_result = GNUBG_NATIVE_ENGINE_ERROR;
 
     engine = gnubg_native_create(GNUBG_NATIVE_STANDARD, &callbacks);
@@ -61,11 +60,8 @@ main(void)
            position.turn, position.match_length, position.cube_value,
            checkers[0], checkers[1]);
 
-    for (attempts = 0; attempts < 100; attempts++) {
-        roll_result = gnubg_native_roll(engine);
-        if (roll_result == GNUBG_NATIVE_OK)
-            break;
-    }
+    /* NewMatch may already supply the opening dice. */
+    roll_result = position.dice[0] ? GNUBG_NATIVE_OK : gnubg_native_roll(engine);
     if (roll_result != GNUBG_NATIVE_OK)
         return 4;
     if (gnubg_native_hint(engine, &move) != GNUBG_NATIVE_OK)

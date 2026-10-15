@@ -34,8 +34,17 @@ The platform-neutral C boundary is defined in
 [`native/include/gnubg_native.h`](native/include/gnubg_native.h). A first
 single-handle adapter now starts the real engine, creates a match, and
 returns immutable position snapshots. It also rolls, obtains a real GNUbg
-hint, validates a move against GNUbg's legal move list, and applies it. The
+hint, validates a move against GNUbg's legal move list, and applies it.
 It can also return a synchronous normal evaluation through a C callback. The
 next step is rollout analysis and cancellation/progress handling, followed by
 extracting the upstream initialization so multiple app-owned handles are
 possible.
+
+Snapshots expose board arrays in fixed player identity order, matching scores.
+The adapter validates complete moves before changing the live position and
+reports forced passes as successful rolls. Only human turns can currently be
+rolled through the API; computer turn execution is still pending.
+
+One active handle is supported. Handles can be destroyed and recreated, but
+engine evaluation resources are retained for the process lifetime because the
+upstream shutdown path is not safe for repeated initialization.
