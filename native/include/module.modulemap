@@ -1,0 +1,4 @@
+module GNUbgNative {
+    header "gnubg_native.h"
+    export *
+}

@@ -33,23 +33,29 @@ modifying the engine must comply with that license.
 See [ROADMAP.md](ROADMAP.md) for completed work, milestone acceptance criteria,
 and the current target: a usable macOS app through milestone 5.
 
+## Run the macOS app
+
+```sh
+native/scripts/build-macos-app.sh
+open ".build/macos/GNUbg Apple.app"
+```
+
+Local development build for Apple silicon and macOS 15+. It uses the current
+Homebrew libraries; distribution packaging is deferred. See
+[native/docs/build-macos.md](native/docs/build-macos.md) for setup and checks.
+
 ## Current status
 
-The platform-neutral C boundary is defined in
-[`native/include/gnubg_native.h`](native/include/gnubg_native.h). A first
-single-handle adapter now starts the real engine, creates a match, and
-returns immutable position snapshots. It also rolls, obtains a real GNUbg
-hint, validates a move against GNUbg's legal move list, and applies it.
-It can also return a synchronous normal evaluation through a C callback. The
-next step is rollout analysis and cancellation/progress handling, followed by
-extracting the upstream initialization so multiple app-owned handles are
-possible.
+The C boundary supports match play, legal move queries, hints, normal evaluation,
+rollout progress and cancellation, computer turns, cube decisions, resignations
+and next games. Match state and callbacks are exposed through
+[`native/include/gnubg_native.h`](native/include/gnubg_native.h).
 
-Snapshots expose board arrays in fixed player identity order, matching scores.
-The adapter validates complete moves before changing the live position and
-reports forced passes as successful rolls. Only human turns can currently be
-rolled through the API; computer turn execution is still pending.
+The SwiftUI app adds a board with checker selection and move confirmation,
+a legal-move list, local human/computer opponents, match controls and analysis.
+The engine runs on one dedicated OS thread; cancellation can come from the UI.
+One active handle is supported, with process-owned evaluation resources.
 
-One active handle is supported. Handles can be destroyed and recreated, but
-engine evaluation resources are retained for the process lifetime because the
-upstream shutdown path is not safe for repeated initialization.
+C regressions, Swift bundled-engine match execution and UI model tests pass.
+Actual GUI launch, rendered layout and mouse/keyboard verification remain
+pending because the agent execution environment fails macOS app registration.
