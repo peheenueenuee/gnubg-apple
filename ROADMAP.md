@@ -14,6 +14,10 @@ implementation, fixes, validation, and local commits without asking at each
 milestone. The user handles pushes; do not push unless asked. Revisit scope
 when a product decision or an external dependency blocks progress.
 
+The user subsequently requested Japanese support in the future roadmap. Put
+localization immediately after the first macOS app; this roadmap update does
+not by itself authorize implementing all later milestones.
+
 ## Milestones
 
 | Milestone | Scope | Completion criteria | Status |
@@ -22,8 +26,11 @@ when a product decision or an external dependency blocks progress.
 | 2. Basic operation and safety | Match start, roll, hint, move, snapshot, normal evaluation; input validation and handle recreation | Existing smoke and regression checks pass | Complete; match coverage extended in milestone 4 |
 | 3. Analysis | Rollout, progress, cancellation, failure reporting | Start analysis, observe progress, cancel, then successfully analyse again without changing the match | Complete |
 | 4. Complete match lifecycle | Computer turns, cube offer/take/drop, resignation and response, next game and match end | A client can complete a match through the C API with correct scores and terminal states | Complete |
-| 5. First usable macOS app | Swift integration, serialized engine execution, SwiftUI board and checker interaction, hints and analysis | Launch a native app, complete a local match, and run/cancel analysis while the UI stays responsive | Implemented; GUI launch and visual/interaction checks pending |
+| 5. First usable macOS app | Swift integration, serialized engine execution, SwiftUI board and checker interaction, hints and analysis | Launch a native app, complete a local match, and run/cancel analysis while the UI stays responsive | User confirmed GUI launch and gameplay; remaining acceptance checks below |
+| 5.1. Japanese localization | Japanese UI, consistent backgammon terms, localized status/errors and analysis labels; retain English | Follow the system language, with readable Japanese across match and analysis flows and English fallback | Next; requested by user |
+| 5.2. Interaction polish | Clearer move guidance, undoing staged selections, board orientation/labels, resizing and accessibility | Common and edge-case game actions are understandable and usable in both languages | Planned |
 | 6. Records and usability | Save/load, history navigation, analysis presentation, preferences | Close and reopen a saved match and navigate its record | Later |
+| 6.1. Analysis and opponent settings | Adjustable computer strength, evaluation depth, rollout options and clearer result explanations | Settings affect actual engine behavior; clients can understand the result perspective and accuracy/cost tradeoffs | Planned |
 | 7. iPhone and iPad | iOS engine build and bundled resources, touch input and adaptive layout | Run the same rules and analysis on physical iOS/iPadOS devices | Later |
 | 8. Distribution | Size and performance work, signing, distribution and license review | Another user can install and run the application with the required resources | Later |
 
@@ -43,20 +50,47 @@ when a product decision or an external dependency blocks progress.
 - SwiftUI provides a board, move confirmation, legal-move list, match controls,
   local human/computer play, hints and analysis. Computer responses are scheduled
   by the UI after each engine snapshot.
-- GUI verification is still pending: this execution environment aborts in
-  `NSApplication` registration, and LaunchServices reports -10827. A successful
-  build/model test does not verify rendered layout, mouse input or keyboard input.
+- On 2026-10-16, the user confirmed successful GUI launch and gameplay. This
+  resolves the basic launch/play uncertainty. Specific edge cases, complete-match
+  presentation and rollout cancellation/responsiveness in the visible UI have
+  not yet been individually confirmed.
+- Agent-side GUI automation remains unavailable: this execution environment
+  aborts in `NSApplication` registration and LaunchServices reports -10827.
 - Validation logs are retained under `.build/logs/` after this implementation run.
 
 ## Remaining acceptance work for milestone 5
 
-1. Launch the `.app` in a normal GUI session and inspect its board and controls.
+1. Basic GUI launch and gameplay: confirmed by the user on 2026-10-16.
 2. Exercise click-based checker selection, bearing off, undo selection and move
    confirmation; check resizing, labels, disabled controls and keyboard actions.
 3. Play a human/computer match to completion and verify cube, resignation,
    next-game and final-match presentation.
 4. Run/cancel/restart a rollout while interacting with the window and confirm
    that the UI remains responsive. Fix issues revealed by these visible checks.
+
+## Japanese localization scope and next priorities
+
+Work in this order: finish the remaining milestone 5 checks alongside Japanese
+localization, polish interactions, add records, expand analysis/opponent settings,
+then move to iOS and distribution.
+
+Japanese localization includes:
+
+- Match controls, dialogs, board instructions, legal move descriptions, status,
+  analysis progress/results and user-facing error messages.
+- Consistent terminology: ヒント, キューブ, テイク, ドロップ, 投了, ギャモン,
+  バックギャモン and ロールアウト. Keep terminology in one documented glossary.
+- Move user-visible strings out of Swift source into localization resources;
+  map C result codes to localized app messages rather than exposing raw English
+  engine messages as the primary UI. Preserve diagnostic details in logs.
+- Follow the macOS language preference by default; retain English resources and
+  fallback. A per-app language picker can be added with later preferences work.
+- Check dynamic numbers, interpolation, wrapping and truncation in both languages,
+  including narrow windows, confirmations and long error/progress messages.
+
+Save/load and history should precede deeper analysis work so users can preserve
+and revisit useful positions. Distribution and iOS stay later because they need
+additional dependency packaging and platform validation.
 
 ## Design constraints and deferred work
 
@@ -74,6 +108,7 @@ when a product decision or an external dependency blocks progress.
   `/Applications`. The local app uses a script-driven Swift target and ad hoc
   signing; a build-local VFS overlay handles duplicate CLT SwiftBridging maps.
 - Automated checks establish the cases they cover; complete match regressions
-  pass, while visible UI checks and device validation remain outstanding.
+  pass, and basic GUI gameplay is user-confirmed; detailed UI checks and device
+  validation remain outstanding.
 
 Update this document as milestones are completed or scope changes.
