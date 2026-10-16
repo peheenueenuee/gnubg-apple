@@ -33,6 +33,8 @@ modifying the engine must comply with that license.
 See [ROADMAP.md](ROADMAP.md) for completed work, milestone acceptance criteria,
 and the current target: a usable macOS app through milestone 5.
 
+操作や機能の要望は [要望.txt](要望.txt) に1要望1行で追記できます。
+
 ## Run the macOS app
 
 ```sh

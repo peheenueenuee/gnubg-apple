@@ -68,6 +68,14 @@ not by itself authorize implementing all later milestones.
 4. Run/cancel/restart a rollout while interacting with the window and confirm
    that the UI remains responsive. Fix issues revealed by these visible checks.
 
+## User feedback workflow
+
+The user writes requests freely in `要望.txt`, one request per line; no numbering
+or template is required. Read it before interaction-polish work. The user wants
+to shape that milestone collaboratively: make small, reviewable changes and
+incorporate their feedback. Keep the user's original lines intact; record
+implementation status separately rather than rewriting or deleting requests.
+
 ## Japanese localization scope and next priorities
 
 Work in this order: finish the remaining milestone 5 checks alongside Japanese
