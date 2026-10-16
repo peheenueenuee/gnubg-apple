@@ -14,7 +14,8 @@ implementation, fixes, validation, and local commits without asking at each
 milestone. The user handles pushes; do not push unless asked. Revisit scope
 when a product decision or an external dependency blocks progress.
 
-The user subsequently requested Japanese support in the future roadmap. Put
+The user subsequently requested Japanese support in the future roadmap.
+After asking to proceed, the current follow-on implementation is milestone 5.1. Put
 localization immediately after the first macOS app; this roadmap update does
 not by itself authorize implementing all later milestones.
 
@@ -27,7 +28,7 @@ not by itself authorize implementing all later milestones.
 | 3. Analysis | Rollout, progress, cancellation, failure reporting | Start analysis, observe progress, cancel, then successfully analyse again without changing the match | Complete |
 | 4. Complete match lifecycle | Computer turns, cube offer/take/drop, resignation and response, next game and match end | A client can complete a match through the C API with correct scores and terminal states | Complete |
 | 5. First usable macOS app | Swift integration, serialized engine execution, SwiftUI board and checker interaction, hints and analysis | Launch a native app, complete a local match, and run/cancel analysis while the UI stays responsive | User confirmed GUI launch and gameplay; remaining acceptance checks below |
-| 5.1. Japanese localization | Japanese UI, consistent backgammon terms, localized status/errors and analysis labels; retain English | Follow the system language, with readable Japanese across match and analysis flows and English fallback | Next; requested by user |
+| 5.1. Japanese localization | Japanese UI, consistent backgammon terms, localized status/errors and analysis labels; retain English | Follow the system language, with readable Japanese across match and analysis flows and English fallback | Implemented; language/model checks pass, visual text layout pending |
 | 5.2. Interaction polish | Clearer move guidance, undoing staged selections, board orientation/labels, resizing and accessibility | Common and edge-case game actions are understandable and usable in both languages | Planned |
 | 6. Records and usability | Save/load, history navigation, analysis presentation, preferences | Close and reopen a saved match and navigate its record | Later |
 | 6.1. Analysis and opponent settings | Adjustable computer strength, evaluation depth, rollout options and clearer result explanations | Settings affect actual engine behavior; clients can understand the result perspective and accuracy/cost tradeoffs | Planned |
@@ -56,6 +57,10 @@ not by itself authorize implementing all later milestones.
   not yet been individually confirmed.
 - Agent-side GUI automation remains unavailable: this execution environment
   aborts in `NSApplication` registration and LaunchServices reports -10827.
+- Japanese and English localization is implemented with 73 resource keys.
+  System-language selection, explicit Japanese/English, unsupported-language
+  fallback and model smoke checks pass. This Mac selects Japanese by default.
+  Localized visual wrapping and truncation remain to be checked in the GUI.
 - Validation logs are retained under `.build/logs/` after this implementation run.
 
 ## Remaining acceptance work for milestone 5

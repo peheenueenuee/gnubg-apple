@@ -28,24 +28,23 @@ func runUISmoke(render: Bool = true) {
     waitForIdle(model)
     model.analyse(rollout: false)
     waitForIdle(model)
-    precondition(model.analysisText.contains("Equity"))
+    precondition(model.analysisText.contains(L10n.text("analysis.normal_detail")))
     model.trials = 4
     model.analyse(rollout: true)
     waitForIdle(model)
-    precondition(model.analysisText.contains("4 trials"))
+    precondition(model.analysisText.contains(L10n.text("analysis.completed_trials", UInt32(4))))
     model.trials = 100000
     model.analyse(rollout: true)
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { model.cancel() }
     waitForIdle(model)
-    precondition(model.status.contains("cancelled"), model.status)
+    precondition(model.status == L10n.text("status.cancelled"), model.status)
     model.analyse(rollout: false)
     waitForIdle(model)
-    precondition(model.analysisText.contains("Equity"))
-    model.trials = 36
+    precondition(model.analysisText.contains(L10n.text("analysis.normal_detail")))
     model.trials = 4
     model.analyse(rollout: true)
     waitForIdle(model)
-    precondition(model.analysisText.contains("4 trials"))
+    precondition(model.analysisText.contains(L10n.text("analysis.completed_trials", UInt32(4))))
     model.trials = 36
     // End a match through the same actions used by the SwiftUI controls.
     model.matchLength = 1

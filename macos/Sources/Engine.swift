@@ -5,7 +5,7 @@ import GNUbgNative
 struct Step: Equatable {
     let from: Int
     let to: Int
-    var label: String { "\(from == 24 ? "Bar" : String(from + 1))/\(to < 0 ? "Off" : String(to + 1))" }
+    var label: String { "\(from == 24 ? L10n.text("move.bar") : String(from + 1))/\(to < 0 ? L10n.text("move.off") : String(to + 1))" }
 }
 struct Move: Identifiable {
     let id: Int
@@ -86,8 +86,8 @@ final class EngineModel: ObservableObject {
     @Published var busy = true
     @Published var analysing = false
     @Published var progress: Double = 0
-    @Published var status = "Starting engine…"
-    @Published var analysisText = "Run an evaluation or rollout to inspect the position."
+    @Published var status = L10n.text("status.starting")
+    @Published var analysisText = L10n.text("analysis.empty")
     @Published var matchLength = 3
     @Published var computer = true
     @Published var trials = 36
@@ -105,14 +105,15 @@ final class EngineModel: ObservableObject {
                 guard let context, let message else { return }
                 let model = Unmanaged<EngineModel>.fromOpaque(context).takeUnretainedValue()
                 let text = String(cString: message)
-                DispatchQueue.main.async { model.status = text }
+                fputs("GNUbg: \(text)\n", stderr)
+                DispatchQueue.main.async { model.status = L10n.engineMessage(text) }
             }
             callbacks.progress = { context, completed, total in
                 guard let context else { return }
                 let model = Unmanaged<EngineModel>.fromOpaque(context).takeUnretainedValue()
                 DispatchQueue.main.async {
                     model.progress = total == 0 ? 0 : Double(completed) / Double(total)
-                    model.status = "Rollout: \(completed) / \(total)"
+                    model.status = L10n.text("status.rollout", completed, total)
                 }
             }
             callbacks.analysis = { context, result in
@@ -121,14 +122,15 @@ final class EngineModel: ObservableObject {
                 let value = result.pointee
                 let outputs = withUnsafeBytes(of: value.outputs) { Array($0.bindMemory(to: Float.self)) }
                 let errors = withUnsafeBytes(of: value.standard_errors) { Array($0.bindMemory(to: Float.self)) }
-                let text = String(format: "%@ · Win %.1f%% · Gammon %.1f%%\nEquity %.3f%@",
-                    value.player == 0 ? "Ivory" : "Charcoal", outputs[0] * 100, outputs[1] * 100,
-                    outputs[5], value.trials > 0 ? String(format: " ± %.3f SE · %u trials", errors[5], value.trials) : " · 0-ply")
+                let text = L10n.text("analysis.summary", L10n.player(Int(value.player)),
+                    outputs[0] * 100, outputs[1] * 100, outputs[5],
+                    value.trials > 0 ? L10n.text("analysis.rollout_detail", errors[5], L10n.text("analysis.completed_trials", value.trials))
+                                    : L10n.text("analysis.normal_detail"))
                 DispatchQueue.main.async { model.analysisText = text }
             }
             self.handle = gnubg_native_create(GNUBG_NATIVE_STANDARD, &callbacks)
             guard let handle = self.handle else {
-                DispatchQueue.main.async { self.busy = false; self.status = "Engine could not start. Check bundled resources." }
+                DispatchQueue.main.async { self.busy = false; self.status = L10n.text("error.startup") }
                 return
             }
             DispatchQueue.main.async { self.cancellationHandle = handle }
@@ -147,15 +149,15 @@ final class EngineModel: ObservableObject {
         }
         let state = valid ? Position(snapshot) : nil
         let choices = legal.enumerated().map { Move($0.element, id: $0.offset) }
-        let error = String(cString: gnubg_native_result_string(result))
+        let error = L10n.result(result)
         DispatchQueue.main.async {
             self.position = state
             self.moves = choices
             self.staged = []; self.source = nil
             self.busy = false; self.analysing = false
-            if result == GNUBG_NATIVE_CANCELLED { self.status = "Analysis cancelled. Ready." }
-            else if result != GNUBG_NATIVE_OK { self.status = "Could not complete action: \(error)" }
-            else if let hint { self.status = "Hint: \(hint.label)" }
+            if result == GNUBG_NATIVE_CANCELLED { self.status = L10n.text("status.cancelled") }
+            else if result != GNUBG_NATIVE_OK { self.status = L10n.text("status.failed", error) }
+            else if let hint { self.status = L10n.text("status.hint", hint.label) }
             else { self.status = self.turnDescription }
             if result == GNUBG_NATIVE_OK && state?.raw.computer_turn != 0 && state?.raw.game_over == 0 {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
@@ -167,19 +169,19 @@ final class EngineModel: ObservableObject {
         }
     }
     var turnDescription: String {
-        guard let p = position else { return "Engine unavailable" }
-        if p.raw.match_over != 0 { return "Match complete — \(p.scores[0] > p.scores[1] ? "Ivory" : "Charcoal") wins" }
-        if p.raw.game_over != 0 { return "Game complete. Start the next game." }
-        let name = p.raw.turn == 0 ? "Ivory" : "Charcoal"
-        if p.raw.doubled != 0 { return "\(name): take or drop the cube" }
-        if p.raw.resignation != 0 { return "\(name): accept or reject resignation (\(p.raw.resignation))" }
-        return "\(name) to play\(p.raw.computer_turn != 0 ? " · Computer" : "")"
+        guard let p = position else { return L10n.text("error.unavailable") }
+        if p.raw.match_over != 0 { return L10n.text("status.match_complete", L10n.player(p.scores[0] > p.scores[1] ? 0 : 1)) }
+        if p.raw.game_over != 0 { return L10n.text("status.game_complete") }
+        let name = L10n.player(Int(p.raw.turn))
+        if p.raw.doubled != 0 { return L10n.text("status.cube_response", name) }
+        if p.raw.resignation != 0 { return L10n.text("status.resign_response", name, p.raw.resignation) }
+        return L10n.text("status.turn", name, p.raw.computer_turn != 0 ? L10n.text("status.computer") : "")
     }
     private func run(analysis: Bool = false, _ action: @escaping (OpaquePointer) -> gnubg_native_result) {
         guard !busy, cancellationHandle != nil else { return }
         busy = true; analysing = analysis; staged = []; source = nil
-        if !analysis { analysisText = "Run an evaluation or rollout to inspect the position." }
-        if analysis { progress = 0; status = "Analysing…" }
+        if !analysis { analysisText = L10n.text("analysis.empty") }
+        if analysis { progress = 0; status = L10n.text("status.analysing") }
         queue.async {
             guard let handle = self.handle else { return }
             self.finish(action(handle))
@@ -187,7 +189,7 @@ final class EngineModel: ObservableObject {
     }
     func newMatch() {
         let length = UInt32(matchLength), opponent = computer ? GNUBG_NATIVE_COMPUTER : GNUBG_NATIVE_HUMAN
-        analysisText = "Run an evaluation or rollout to inspect the position."
+        analysisText = L10n.text("analysis.empty")
         run { gnubg_native_start_match($0, length, GNUBG_NATIVE_HUMAN, opponent) }
     }
     func roll() { run { gnubg_native_roll($0) } }

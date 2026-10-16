@@ -46,6 +46,10 @@ Local development build for Apple silicon and macOS 15+. It uses the current
 Homebrew libraries; distribution packaging is deferred. See
 [native/docs/build-macos.md](native/docs/build-macos.md) for setup and checks.
 
+The UI follows the macOS language preference and supports Japanese and English.
+Quit and reopen the app after rebuilding to load the updated language resources.
+See [localization notes and terminology](macos/LOCALIZATION.md).
+
 ## Current status
 
 The C boundary supports match play, legal move queries, hints, normal evaluation,

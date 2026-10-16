@@ -61,8 +61,8 @@ struct PointView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Point \(point + 1), \(count) \(owner == 0 ? "ivory" : "charcoal") checkers")
-        .help("\(state.player == 0 ? "Ivory" : "Charcoal") coordinate: \(ownPoint + 1)")
+        .accessibilityLabel(L10n.text("board.point_accessibility", point + 1, count, L10n.player(owner)))
+        .help(L10n.text("board.coordinate", L10n.player(state.player), ownPoint + 1))
     }
 }
 
@@ -73,11 +73,11 @@ struct BoardView: View {
         let preview = position.preview(model.staged)
         VStack(spacing: 12) {
             HStack {
-                Label("Ivory  \(position.scores[0])", systemImage: "circle.fill")
+                Label(L10n.text("board.score", L10n.player(0), position.scores[0]), systemImage: "circle.fill")
                 Spacer()
-                Text("Game \(position.raw.game_number) · \(position.raw.match_length) points\(position.raw.crawford != 0 ? " · Crawford" : "")")
+                Text(L10n.text("board.game", position.raw.game_number, position.raw.match_length, position.raw.crawford != 0 ? L10n.text("board.crawford") : ""))
                 Spacer()
-                Label("Charcoal  \(position.scores[1])", systemImage: "circle")
+                Label(L10n.text("board.score", L10n.player(1), position.scores[1]), systemImage: "circle")
             }.font(.subheadline.weight(.semibold))
             VStack(spacing: 10) {
                 HStack(spacing: 4) {
@@ -87,13 +87,13 @@ struct BoardView: View {
                     }
                 }
                 HStack {
-                    Button("Bar · Ivory \(preview.bars[0]) / Charcoal \(preview.bars[1])") { model.select(24) }
+                    Button(L10n.text("board.bar", preview.bars[0], preview.bars[1])) { model.select(24) }
                         .tint(model.source == 24 ? .orange : teal)
                     Spacer()
-                    Text(position.raw.dice.0 > 0 ? "⚄  \(position.raw.dice.0)   \(position.raw.dice.1)" : "Awaiting roll")
+                    Text(position.raw.dice.0 > 0 ? "⚄  \(position.raw.dice.0)   \(position.raw.dice.1)" : L10n.text("board.awaiting_roll"))
                         .font(.title3.monospacedDigit().weight(.semibold))
                     Spacer()
-                    Button("Off · Ivory \(preview.off[0]) / Charcoal \(preview.off[1])") { model.select(-1) }
+                    Button(L10n.text("board.off", preview.off[0], preview.off[1])) { model.select(-1) }
                         .tint(model.nextSteps.contains { $0.from == model.source && $0.to == -1 } ? .orange : teal)
                 }.font(.caption)
                 HStack(spacing: 4) {
@@ -107,11 +107,11 @@ struct BoardView: View {
             .background(Color(red: 0.91, green: 0.86, blue: 0.73), in: RoundedRectangle(cornerRadius: 14))
             .overlay(RoundedRectangle(cornerRadius: 14).stroke(ink.opacity(0.25), lineWidth: 5))
             HStack {
-                Text("\(position.player == 0 ? "Ivory" : "Charcoal"): select a checker, then a highlighted destination.")
+                Text(L10n.text("board.instructions", L10n.player(position.player)))
                     .font(.caption).foregroundColor(.secondary)
                 Spacer()
-                Button("Undo selection") { model.staged = []; model.source = nil }.disabled(model.staged.isEmpty && model.source == nil)
-                Button("Confirm move") { if let move = model.completeMove { model.play(move) } }
+                Button(L10n.text("board.undo")) { model.staged = []; model.source = nil }.disabled(model.staged.isEmpty && model.source == nil)
+                Button(L10n.text("board.confirm")) { if let move = model.completeMove { model.play(move) } }
                     .keyboardShortcut(.return, modifiers: [])
                     .disabled(model.completeMove == nil || model.busy)
             }
@@ -129,21 +129,21 @@ struct ContentView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("GNUbg Apple").font(.largeTitle.bold()).foregroundColor(ink)
-                    Text("A quiet place to play and explore.").foregroundColor(.secondary)
+                    Text(L10n.text("app.tagline")).foregroundColor(.secondary)
                 }
                 Spacer()
-                Picker("Match", selection: $model.matchLength) {
-                    ForEach([1, 3, 5, 7, 11], id: \.self) { Text("\($0) points").tag($0) }
+                Picker(L10n.text("match.label"), selection: $model.matchLength) {
+                    ForEach([1, 3, 5, 7, 11], id: \.self) { Text(L10n.text("match.points", $0)).tag($0) }
                 }.frame(width: 160)
-                Toggle("Computer opponent", isOn: $model.computer).toggleStyle(.checkbox)
-                Button("New match") { confirmNew = true }.disabled(model.busy)
+                Toggle(L10n.text("match.computer"), isOn: $model.computer).toggleStyle(.checkbox)
+                Button(L10n.text("match.new")) { confirmNew = true }.disabled(model.busy)
             }
             HStack(alignment: .top, spacing: 22) {
                 if let position = model.position {
                     BoardView(model: model, position: position)
                         .disabled(model.busy || position.raw.game_over != 0 || position.raw.computer_turn != 0)
                 } else {
-                    ProgressView("Preparing board…").frame(maxWidth: .infinity, maxHeight: .infinity)
+                    ProgressView(L10n.text("board.preparing")).frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
                 sidebar.frame(width: 245)
             }
@@ -151,7 +151,7 @@ struct ContentView: View {
                 Circle().fill(model.busy ? Color.orange : teal).frame(width: 8, height: 8)
                 Text(model.status).font(.callout).textSelection(.enabled)
                 Spacer()
-                Text("Offline · GNUbg \(String(cString: gnubg_native_version()))").font(.caption).foregroundColor(.secondary)
+                Text(L10n.text("app.offline", String(cString: gnubg_native_version()))).font(.caption).foregroundColor(.secondary)
             }
         }
         .padding(24)
@@ -159,8 +159,9 @@ struct ContentView: View {
         .background(Color(red: 0.97, green: 0.96, blue: 0.93))
         .tint(teal)
         .preferredColorScheme(.light)
-        .confirmationDialog("Start a new match? Current match progress will be discarded.", isPresented: $confirmNew) {
-            Button("Start new match") { model.newMatch() }
+        .confirmationDialog(L10n.text("match.confirm_new"), isPresented: $confirmNew) {
+            Button(L10n.text("match.start")) { model.newMatch() }
+            Button(L10n.text("app.cancel"), role: .cancel) {}
         }
     }
     @ViewBuilder private var sidebar: some View {
@@ -169,60 +170,60 @@ struct ContentView: View {
         let human = p?.computer_turn == 0
         let decision = p?.doubled != 0 || p?.resignation != 0
         VStack(alignment: .leading, spacing: 14) {
-            Text("YOUR TABLE").font(.caption.weight(.bold)).foregroundColor(teal)
+            Text(L10n.text("panel.table")).font(.caption.weight(.bold)).foregroundColor(teal)
             Text(model.turnDescription).font(.headline)
             HStack {
-                Text("Cube \(p?.cube_value ?? 1)").font(.title2.bold())
+                Text(L10n.text("cube.value", p?.cube_value ?? 1)).font(.title2.bold())
                 Spacer()
-                Text(p?.cube_owner == -1 ? "Centered" : (p?.cube_owner == 0 ? "Ivory owns" : "Charcoal owns")).font(.caption)
+                Text(p?.cube_owner == -1 ? L10n.text("cube.centered") : L10n.text("cube.owner", L10n.player(Int(p?.cube_owner ?? 0)))).font(.caption)
             }
             if p?.doubled != 0 {
                 HStack {
-                    Button("Take") { model.act(GNUBG_NATIVE_TAKE) }
-                    Button("Drop") { model.act(GNUBG_NATIVE_DROP) }
+                    Button(L10n.text("cube.take")) { model.act(GNUBG_NATIVE_TAKE) }
+                    Button(L10n.text("cube.drop")) { model.act(GNUBG_NATIVE_DROP) }
                 }.disabled(model.busy || !human)
             } else if p?.resignation != 0 {
                 HStack {
-                    Button("Accept") { model.act(GNUBG_NATIVE_ACCEPT_RESIGNATION) }
-                    Button("Reject") { model.act(GNUBG_NATIVE_REJECT_RESIGNATION) }
+                    Button(L10n.text("resign.accept")) { model.act(GNUBG_NATIVE_ACCEPT_RESIGNATION) }
+                    Button(L10n.text("resign.reject")) { model.act(GNUBG_NATIVE_REJECT_RESIGNATION) }
                 }.disabled(model.busy || !human)
             } else if p?.game_over != 0 {
-                Button("Next game") { model.act(GNUBG_NATIVE_NEXT_GAME) }
+                Button(L10n.text("match.next_game")) { model.act(GNUBG_NATIVE_NEXT_GAME) }
                     .disabled(model.busy || p?.match_over != 0)
             } else {
                 HStack {
-                    Button("Roll dice") { model.roll() }.buttonStyle(.borderedProminent)
+                    Button(L10n.text("game.roll")) { model.roll() }.buttonStyle(.borderedProminent)
                         .disabled(model.busy || !human || p?.dice.0 != 0)
-                    Button("Double") { model.act(GNUBG_NATIVE_DOUBLE) }
+                    Button(L10n.text("cube.double")) { model.act(GNUBG_NATIVE_DOUBLE) }
                         .disabled(model.busy || !human || p?.can_double == 0)
                 }
                 HStack {
-                    Button("Hint") { model.hint() }.disabled(model.busy || !human || model.moves.isEmpty)
-                    Menu("Resign") {
-                        ForEach(1...3, id: \.self) { points in Button("\(points) × cube") { model.resign(points) } }
+                    Button(L10n.text("game.hint")) { model.hint() }.disabled(model.busy || !human || model.moves.isEmpty)
+                    Menu(L10n.text("game.resign")) {
+                        ForEach(1...3, id: \.self) { points in Button(L10n.text("resign.points", points)) { model.resign(points) } }
                     }.disabled(model.busy || !human)
                 }
                 if !human {
-                    Button("Play computer turn") { model.act(GNUBG_NATIVE_COMPUTER_TURN) }.disabled(model.busy)
+                    Button(L10n.text("game.computer_turn")) { model.act(GNUBG_NATIVE_COMPUTER_TURN) }.disabled(model.busy)
                 }
             }
             Divider()
-            Text("ANALYSIS").font(.caption.weight(.bold)).foregroundColor(teal)
+            Text(L10n.text("panel.analysis")).font(.caption.weight(.bold)).foregroundColor(teal)
             Text(model.analysisText).font(.callout.monospacedDigit()).textSelection(.enabled)
-            Picker("Trials", selection: $model.trials) {
-                ForEach([36, 1296, 5184], id: \.self) { Text("\($0)").tag($0) }
+            Picker(L10n.text("analysis.trials"), selection: $model.trials) {
+                ForEach([36, 1296, 5184], id: \.self) { Text(L10n.text("analysis.trial_count", $0)).tag($0) }
             }.disabled(model.busy)
             HStack {
-                Button("Evaluate") { model.analyse(rollout: false) }
-                Button("Rollout") { model.analyse(rollout: true) }
+                Button(L10n.text("analysis.evaluate")) { model.analyse(rollout: false) }
+                Button(L10n.text("analysis.rollout")) { model.analyse(rollout: true) }
             }.disabled(model.busy || !playing || decision)
             if model.analysing {
                 ProgressView(value: model.progress)
-                Button("Cancel analysis") { model.cancel() }
+                Button(L10n.text("analysis.cancel")) { model.cancel() }
             }
             Divider()
-            Text("LEGAL MOVES · \(model.moves.count)").font(.caption.weight(.bold)).foregroundColor(teal)
-            Text("Choose a complete move here, or use the board. Points in this list use the moving player's coordinates.")
+            Text(L10n.text("panel.legal_moves", model.moves.count)).font(.caption.weight(.bold)).foregroundColor(teal)
+            Text(L10n.text("move.instructions"))
                 .font(.caption).foregroundColor(.secondary)
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 6) {
@@ -249,7 +250,9 @@ struct GNUbgApp: App {
 
 @main enum Launcher {
     static func main() {
-        if CommandLine.arguments.contains("--model-smoke") {
+        if CommandLine.arguments.contains("--localization-smoke") {
+            runLocalizationSmoke()
+        } else if CommandLine.arguments.contains("--model-smoke") {
             runUISmoke(render: false)
         } else if CommandLine.arguments.contains("--ui-smoke") {
             runUISmoke()

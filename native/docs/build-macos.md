@@ -72,3 +72,14 @@ completion, using the same observable model as the UI. Both passed locally.
 execution environment aborts during `NSApplication` registration; LaunchServices
 also returns -10827. Compilation and model tests do not establish visual layout
 or actual mouse/keyboard behavior. Those checks remain pending.
+
+
+## Japanese and English
+
+The build copies both localization resource folders into the app before signing.
+The interface follows macOS language preferences, with English as the fallback.
+Quit and reopen an already running app after rebuilding. Localization validation
+and the shared UI model smoke pass in Japanese and English; see
+[`macos/LOCALIZATION.md`](../../macos/LOCALIZATION.md) for commands and terminology.
+Actual Japanese text wrapping/truncation and VoiceOver output still require GUI
+checks. Localization does not change checker input or move semantics.

@@ -37,6 +37,7 @@ swiftc -Xfrontend -warn-long-expression-type-checking -Xfrontend 500 \
     -framework AudioToolbox -framework CoreAudio $pkg_libs -lreadline -lncurses -lm \
     -o "$app_dir/Contents/MacOS/GNUbgApple"
 cp macos/Info.plist "$app_dir/Contents/Info.plist"
+cp -R macos/Resources/en.lproj macos/Resources/ja.lproj "$app_dir/Contents/Resources/"
 cp "$engine_dir/gnubg.wd" "$engine_dir/gnubg_os0.bd" "$engine_dir/gnubg_ts0.bd" \
     "$app_dir/Contents/Resources/engine/"
 cp "$engine_dir/met/Kazaross-XG2.xml" "$app_dir/Contents/Resources/engine/met/"
