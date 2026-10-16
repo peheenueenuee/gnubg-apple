@@ -91,6 +91,15 @@ final class EngineModel: ObservableObject {
     @Published var matchLength = 3
     @Published var computer = true
     @Published var trials = 36
+    @Published var colorChoice: PlayerColorChoice = .alternating
+    @Published private(set) var humanPlayer = 0
+    @Published private(set) var activeComputer = true
+    @Published private(set) var hoveredMove: Move?
+    @Published private(set) var lastTurns: [TurnPresentation?] = [nil, nil]
+    private struct MatchConfiguration {
+        let humanPlayer: Int
+        let computer: Bool
+    }
     private let queue = EngineWorker()
     private var handle: OpaquePointer?
     private var cancellationHandle: OpaquePointer? // main-thread copy; handle lives until process exit
@@ -138,7 +147,7 @@ final class EngineModel: ObservableObject {
             self.finish(result)
         }
     }
-    private func finish(_ result: gnubg_native_result, hint: Move? = nil) {
+    private func finish(_ result: gnubg_native_result, hint: Move? = nil, configuration: MatchConfiguration? = nil) {
         var snapshot = gnubg_native_position()
         let valid = gnubg_native_snapshot(handle, &snapshot) == GNUBG_NATIVE_OK
         var count: UInt32 = 0
@@ -147,10 +156,23 @@ final class EngineModel: ObservableObject {
             legal = Array(repeating: gnubg_native_move(), count: Int(count))
             _ = legal.withUnsafeMutableBufferPointer { gnubg_native_legal_moves(handle, $0.baseAddress, count, &count) }
         }
+        var turns: [TurnPresentation?] = [nil, nil]
+        for player in 0...1 {
+            var turn = gnubg_native_turn()
+            if gnubg_native_last_turn(handle, Int8(player), &turn) == GNUBG_NATIVE_OK {
+                turns[player] = TurnPresentation(turn)
+            }
+        }
         let state = valid ? Position(snapshot) : nil
         let choices = legal.enumerated().map { Move($0.element, id: $0.offset) }
         let error = L10n.result(result)
         DispatchQueue.main.async {
+            if result == GNUBG_NATIVE_OK, let configuration {
+                self.humanPlayer = configuration.humanPlayer
+                self.activeComputer = configuration.computer
+            }
+            self.lastTurns = turns
+            self.hoveredMove = nil
             self.position = state
             self.moves = choices
             self.staged = []; self.source = nil
@@ -177,20 +199,26 @@ final class EngineModel: ObservableObject {
         if p.raw.resignation != 0 { return L10n.text("status.resign_response", name, p.raw.resignation) }
         return L10n.text("status.turn", name, p.raw.computer_turn != 0 ? L10n.text("status.computer") : "")
     }
-    private func run(analysis: Bool = false, _ action: @escaping (OpaquePointer) -> gnubg_native_result) {
+    private func run(analysis: Bool = false, configuration: MatchConfiguration? = nil, _ action: @escaping (OpaquePointer) -> gnubg_native_result) {
         guard !busy, cancellationHandle != nil else { return }
-        busy = true; analysing = analysis; staged = []; source = nil
+        busy = true; analysing = analysis; staged = []; source = nil; hoveredMove = nil
         if !analysis { analysisText = L10n.text("analysis.empty") }
         if analysis { progress = 0; status = L10n.text("status.analysing") }
         queue.async {
             guard let handle = self.handle else { return }
-            self.finish(action(handle))
+            self.finish(action(handle), configuration: configuration)
         }
     }
     func newMatch() {
-        let length = UInt32(matchLength), opponent = computer ? GNUBG_NATIVE_COMPUTER : GNUBG_NATIVE_HUMAN
-        analysisText = L10n.text("analysis.empty")
-        run { gnubg_native_start_match($0, length, GNUBG_NATIVE_HUMAN, opponent) }
+        guard !busy else { return }
+        let length = UInt32(matchLength)
+        let side = colorChoice.player(after: humanPlayer)
+        let enabled = computer
+        let player0 = enabled && side == 1 ? GNUBG_NATIVE_COMPUTER : GNUBG_NATIVE_HUMAN
+        let player1 = enabled && side == 0 ? GNUBG_NATIVE_COMPUTER : GNUBG_NATIVE_HUMAN
+        run(configuration: MatchConfiguration(humanPlayer: side, computer: enabled)) {
+            gnubg_native_start_match($0, length, player0, player1)
+        }
     }
     func roll() { run { gnubg_native_roll($0) } }
     func act(_ action: gnubg_native_action) { run { gnubg_native_act($0, action) } }
@@ -200,7 +228,7 @@ final class EngineModel: ObservableObject {
     }
     func hint() {
         guard !busy else { return }
-        busy = true
+        busy = true; hoveredMove = nil
         queue.async {
             var value = gnubg_native_move()
             let result = gnubg_native_hint(self.handle, &value)
@@ -218,11 +246,47 @@ final class EngineModel: ObservableObject {
     var candidates: [Move] { moves.filter { Array($0.steps.prefix(staged.count)) == staged } }
     var nextSteps: [Step] { candidates.compactMap { $0.steps.count > staged.count ? $0.steps[staged.count] : nil } }
     func select(_ point: Int) {
-        guard !busy, position?.raw.computer_turn == 0 else { return }
+        guard canInteractBoard else { return }
+        hoveredMove = nil
         if let source, let step = nextSteps.first(where: { $0.from == source && $0.to == point }) {
             staged.append(step); self.source = nil
         } else if nextSteps.contains(where: { $0.from == point }) { source = point }
         else { source = nil }
     }
+    var canInteractBoard: Bool {
+        guard let p = position?.raw else { return false }
+        return !busy && p.game_over == 0 && p.computer_turn == 0 &&
+            p.doubled == 0 && p.resignation == 0 && p.dice.0 > 0
+    }
+    func canRoll(player: Int) -> Bool {
+        guard let p = position?.raw else { return false }
+        return !busy && p.game_over == 0 && p.computer_turn == 0 &&
+            Int(p.turn) == player && p.dice.0 == 0 && p.doubled == 0 && p.resignation == 0
+    }
+    var displayPosition: Position? { position?.preview(hoveredMove?.steps ?? staged) }
+    var lastOpponentTurn: TurnPresentation? { lastTurns[1 - humanPlayer] }
+    func highlightedCheckers(player: Int, point: Int) -> Int {
+        guard hoveredMove == nil, staged.isEmpty, let turn = lastOpponentTurn,
+              turn.player == player else { return 0 }
+        return turn.move.finalDestinations[point, default: 0]
+    }
+    func diceValues(player: Int) -> [Int]? {
+        guard let p = position?.raw else { return nil }
+        if Int(p.board_player) == player && p.dice.0 > 0 && p.game_over == 0 {
+            return [Int(p.dice.0), Int(p.dice.1)]
+        }
+        return lastTurns[player]?.dice
+    }
+    func diceAreCurrent(player: Int) -> Bool {
+        guard let p = position?.raw else { return false }
+        return Int(p.board_player) == player && p.dice.0 > 0 && p.game_over == 0
+    }
+    func hover(_ move: Move, active: Bool) {
+        if active {
+            guard canInteractBoard, moves.contains(where: { $0.id == move.id && $0.steps == move.steps }) else { return }
+            hoveredMove = move
+        } else if hoveredMove?.id == move.id { hoveredMove = nil }
+    }
+    func undoSelection() { staged = []; source = nil; hoveredMove = nil }
     var completeMove: Move? { candidates.first { $0.steps == staged && !staged.isEmpty } }
 }

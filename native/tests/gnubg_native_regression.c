@@ -51,6 +51,7 @@ main(void)
     gnubg_native_position position;
     gnubg_native *engine;
     TanBoard original;
+    gnubg_native_turn last_turn;
     int variant, player, point;
 
     assert(!gnubg_native_create((gnubg_native_variation) 99, NULL));
@@ -112,6 +113,10 @@ main(void)
     ms.anDice[0] = ms.anDice[1] = 0;
     assert(gnubg_native_roll(engine) == GNUBG_NATIVE_OK);
     assert(ms.fTurn == 1 && !ms.anDice[0]);
+    assert(gnubg_native_last_turn(engine, 0, &last_turn) == GNUBG_NATIVE_OK);
+    assert(last_turn.player == 0 && last_turn.move.step_count == 0);
+    assert(last_turn.dice[0] >= 1 && last_turn.dice[0] <= 6);
+    assert(gnubg_native_last_turn(engine, -1, &last_turn) == GNUBG_NATIVE_INVALID_ARGUMENT);
     ap[1].pt = PLAYER_GNU;
     assert(gnubg_native_roll(engine) == GNUBG_NATIVE_NOT_READY);
     gnubg_native_destroy(engine);
@@ -150,6 +155,8 @@ main(void)
         assert(position.game_over);
         if (position.match_over) break;
         assert(gnubg_native_act(engine, GNUBG_NATIVE_NEXT_GAME) == GNUBG_NATIVE_OK);
+        assert(gnubg_native_last_turn(engine, 0, &last_turn) == GNUBG_NATIVE_NOT_READY);
+        assert(gnubg_native_last_turn(engine, 1, &last_turn) == GNUBG_NATIVE_NOT_READY);
     }
     assert(position.match_over);
     gnubg_native_destroy(engine);
@@ -162,8 +169,16 @@ main(void)
     gnubg_native_move choices[4096];
     uint32_t count;
     assert(gnubg_native_legal_moves(engine, choices, 4096, &count) == GNUBG_NATIVE_OK && count);
+    int mover = ms.fMove;
+    unsigned int dice0 = ms.anDice[0], dice1 = ms.anDice[1];
     assert(gnubg_native_play(engine, &choices[0]) == GNUBG_NATIVE_OK);
+    assert(gnubg_native_last_turn(engine, mover, &last_turn) == GNUBG_NATIVE_OK);
+    assert(last_turn.player == mover && last_turn.dice[0] == dice0 && last_turn.dice[1] == dice1);
+    assert(last_turn.move.step_count == choices[0].step_count);
+    assert(memcmp(last_turn.move.steps, choices[0].steps, sizeof(choices[0].steps)) == 0);
     assert(gnubg_native_act(engine, GNUBG_NATIVE_DOUBLE) == GNUBG_NATIVE_OK);
+    /* A pending cube response must not erase checker history. */
+    assert(gnubg_native_last_turn(engine, mover, &last_turn) == GNUBG_NATIVE_OK);
     int taker = ms.fTurn;
     assert(gnubg_native_act(engine, GNUBG_NATIVE_TAKE) == GNUBG_NATIVE_OK);
     assert(ms.nCube == 2 && ms.fCubeOwner == taker && !ms.fDoubled);
@@ -174,8 +189,12 @@ main(void)
     assert(gnubg_native_act(engine, GNUBG_NATIVE_DOUBLE) == GNUBG_NATIVE_OK);
     assert(gnubg_native_act(engine, GNUBG_NATIVE_DROP) == GNUBG_NATIVE_OK);
     assert(ms.gs != GAME_PLAYING && ms.anScore[0] + ms.anScore[1] == 1);
+    assert(gnubg_native_act(engine, GNUBG_NATIVE_NEXT_GAME) == GNUBG_NATIVE_OK);
+    assert(gnubg_native_last_turn(engine, 0, &last_turn) == GNUBG_NATIVE_NOT_READY);
+    assert(gnubg_native_last_turn(engine, 1, &last_turn) == GNUBG_NATIVE_NOT_READY);
     gnubg_native_destroy(engine);
     engine = gnubg_native_create(GNUBG_NATIVE_STANDARD, NULL);
+    assert(gnubg_native_last_turn(engine, 0, &last_turn) == GNUBG_NATIVE_NOT_READY);
     assert(gnubg_native_start_match(engine, 1, GNUBG_NATIVE_COMPUTER,
                                    GNUBG_NATIVE_COMPUTER) == GNUBG_NATIVE_OK);
     int turns = 0;

@@ -2,8 +2,8 @@ import SwiftUI
 import AppKit
 import GNUbgNative
 
-private let ink = Color(red: 0.13, green: 0.21, blue: 0.23)
-private let teal = Color(red: 0.12, green: 0.43, blue: 0.41)
+let ink = Color(red: 0.13, green: 0.21, blue: 0.23)
+let teal = Color(red: 0.12, green: 0.43, blue: 0.41)
 
 struct Triangle: Shape {
     let top: Bool
@@ -13,108 +13,6 @@ struct Triangle: Shape {
             path.addLine(to: CGPoint(x: rect.width, y: top ? 0 : rect.height))
             path.addLine(to: CGPoint(x: rect.midX, y: top ? rect.height : 0))
             path.closeSubpath()
-        }
-    }
-}
-
-struct PointView: View {
-    let point: Int
-    let top: Bool
-    let state: Position
-    @ObservedObject var model: EngineModel
-    private var ownPoint: Int { state.player == 0 ? point : 23 - point }
-    private var owner: Int { state.points[0][point] > 0 ? 0 : 1 }
-    private var count: Int { max(state.points[0][point], state.points[1][23 - point]) }
-    private var destination: Bool { model.nextSteps.contains { $0.from == model.source && $0.to == ownPoint } }
-    private var selectable: Bool { model.nextSteps.contains { $0.from == ownPoint } }
-    var body: some View {
-        Button { model.select(ownPoint) } label: {
-            VStack(spacing: 3) {
-                if top { Text("\(point + 1)").font(.caption2.monospacedDigit()) }
-                ZStack(alignment: top ? .top : .bottom) {
-                    Triangle(top: top)
-                        .fill(point.isMultiple(of: 2) ? teal.opacity(0.8) : Color(red: 0.75, green: 0.44, blue: 0.28))
-                        .padding(.horizontal, 1)
-                    VStack(spacing: 2) {
-                        ForEach(0..<min(count, 5), id: \.self) { index in
-                            Circle().fill(owner == 0 ? Color(red: 0.98, green: 0.94, blue: 0.82) : ink)
-                                .overlay(Circle().stroke(.black.opacity(0.2), lineWidth: 1))
-                                .overlay {
-                                    if index == 4 && count > 5 {
-                                        Text("\(count)").font(.caption.bold()).foregroundColor(owner == 0 ? ink : .white)
-                                    }
-                                }
-                                .frame(maxWidth: 34, maxHeight: 34)
-                                .aspectRatio(1, contentMode: .fit)
-                        }
-                    }.padding(4)
-                    if destination {
-                        RoundedRectangle(cornerRadius: 6).stroke(Color.yellow, lineWidth: 3)
-                    } else if model.source == ownPoint {
-                        RoundedRectangle(cornerRadius: 6).stroke(Color.white, lineWidth: 3)
-                    } else if selectable && model.staged.isEmpty {
-                        RoundedRectangle(cornerRadius: 6).stroke(teal.opacity(0.5), lineWidth: 1)
-                    }
-                }
-                if !top { Text("\(point + 1)").font(.caption2.monospacedDigit()) }
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(L10n.text("board.point_accessibility", point + 1, count, L10n.player(owner)))
-        .help(L10n.text("board.coordinate", L10n.player(state.player), ownPoint + 1))
-    }
-}
-
-struct BoardView: View {
-    @ObservedObject var model: EngineModel
-    let position: Position
-    var body: some View {
-        let preview = position.preview(model.staged)
-        VStack(spacing: 12) {
-            HStack {
-                Label(L10n.text("board.score", L10n.player(0), position.scores[0]), systemImage: "circle.fill")
-                Spacer()
-                Text(L10n.text("board.game", position.raw.game_number, position.raw.match_length, position.raw.crawford != 0 ? L10n.text("board.crawford") : ""))
-                Spacer()
-                Label(L10n.text("board.score", L10n.player(1), position.scores[1]), systemImage: "circle")
-            }.font(.subheadline.weight(.semibold))
-            VStack(spacing: 10) {
-                HStack(spacing: 4) {
-                    ForEach(12..<24, id: \.self) { point in
-                        PointView(point: point, top: true, state: preview, model: model)
-                        if point == 17 { Divider().overlay(ink).padding(.horizontal, 5) }
-                    }
-                }
-                HStack {
-                    Button(L10n.text("board.bar", preview.bars[0], preview.bars[1])) { model.select(24) }
-                        .tint(model.source == 24 ? .orange : teal)
-                    Spacer()
-                    Text(position.raw.dice.0 > 0 ? "⚄  \(position.raw.dice.0)   \(position.raw.dice.1)" : L10n.text("board.awaiting_roll"))
-                        .font(.title3.monospacedDigit().weight(.semibold))
-                    Spacer()
-                    Button(L10n.text("board.off", preview.off[0], preview.off[1])) { model.select(-1) }
-                        .tint(model.nextSteps.contains { $0.from == model.source && $0.to == -1 } ? .orange : teal)
-                }.font(.caption)
-                HStack(spacing: 4) {
-                    ForEach(Array((0..<12).reversed()), id: \.self) { point in
-                        PointView(point: point, top: false, state: preview, model: model)
-                        if point == 6 { Divider().overlay(ink).padding(.horizontal, 5) }
-                    }
-                }
-            }
-            .padding(14)
-            .background(Color(red: 0.91, green: 0.86, blue: 0.73), in: RoundedRectangle(cornerRadius: 14))
-            .overlay(RoundedRectangle(cornerRadius: 14).stroke(ink.opacity(0.25), lineWidth: 5))
-            HStack {
-                Text(L10n.text("board.instructions", L10n.player(position.player)))
-                    .font(.caption).foregroundColor(.secondary)
-                Spacer()
-                Button(L10n.text("board.undo")) { model.staged = []; model.source = nil }.disabled(model.staged.isEmpty && model.source == nil)
-                Button(L10n.text("board.confirm")) { if let move = model.completeMove { model.play(move) } }
-                    .keyboardShortcut(.return, modifiers: [])
-                    .disabled(model.completeMove == nil || model.busy)
-            }
         }
     }
 }
@@ -135,13 +33,15 @@ struct ContentView: View {
                 Picker(L10n.text("match.label"), selection: $model.matchLength) {
                     ForEach([1, 3, 5, 7, 11], id: \.self) { Text(L10n.text("match.points", $0)).tag($0) }
                 }.frame(width: 160)
+                Picker(L10n.text("color.label"), selection: $model.colorChoice) {
+                    ForEach(PlayerColorChoice.allCases) { choice in Text(choice.label).tag(choice) }
+                }.frame(width: 170).help(L10n.text("color.next_match"))
                 Toggle(L10n.text("match.computer"), isOn: $model.computer).toggleStyle(.checkbox)
                 Button(L10n.text("match.new")) { confirmNew = true }.disabled(model.busy)
             }
             HStack(alignment: .top, spacing: 22) {
                 if let position = model.position {
                     BoardView(model: model, position: position)
-                        .disabled(model.busy || position.raw.game_over != 0 || position.raw.computer_turn != 0)
                 } else {
                     ProgressView(L10n.text("board.preparing")).frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
@@ -192,8 +92,6 @@ struct ContentView: View {
                     .disabled(model.busy || p?.match_over != 0)
             } else {
                 HStack {
-                    Button(L10n.text("game.roll")) { model.roll() }.buttonStyle(.borderedProminent)
-                        .disabled(model.busy || !human || p?.dice.0 != 0)
                     Button(L10n.text("cube.double")) { model.act(GNUBG_NATIVE_DOUBLE) }
                         .disabled(model.busy || !human || p?.can_double == 0)
                 }
@@ -233,6 +131,8 @@ struct ContentView: View {
                             .padding(6).frame(maxWidth: .infinity, alignment: .leading)
                             .background(teal.opacity(0.07), in: RoundedRectangle(cornerRadius: 5))
                             .disabled(model.busy || !human)
+                            .onHover { model.hover(move, active: $0) }
+                            .onDisappear { model.hover(move, active: false) }
                     }
                 }
             }.frame(maxHeight: .infinity)

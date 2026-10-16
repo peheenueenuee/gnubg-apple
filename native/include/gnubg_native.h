@@ -18,7 +18,7 @@
 extern "C" {
 #endif
 
-#define GNUBG_NATIVE_API_VERSION 2
+#define GNUBG_NATIVE_API_VERSION 3
 #define GNUBG_NATIVE_ANALYSIS_OUTPUTS 7
 
 enum {
@@ -90,6 +90,14 @@ typedef struct {
     gnubg_native_step steps[4];
 } gnubg_native_move;
 
+/* The most recent completed checker turn by one player in the current game.
+ * A forced pass has step_count 0 but still records the rolled dice. */
+typedef struct {
+    int8_t player;
+    uint8_t dice[2];
+    gnubg_native_move move;
+} gnubg_native_turn;
+
 typedef struct {
     /* 0 requests normal evaluation; 1..1000000 requests a fresh rollout. */
     uint32_t trials;
@@ -160,6 +168,11 @@ gnubg_native_result gnubg_native_analyse(gnubg_native *engine,
 void gnubg_native_cancel(gnubg_native *engine);
 gnubg_native_result gnubg_native_snapshot(const gnubg_native *engine,
                                           gnubg_native_position *position);
+
+/* NOT_READY if this player has not completed a turn in the current game.
+ * Queries do not advance the match; cube actions and analysis preserve history. */
+gnubg_native_result gnubg_native_last_turn(const gnubg_native *engine,
+    int8_t player, gnubg_native_turn *turn);
 
 const char *gnubg_native_result_string(gnubg_native_result result);
 const char *gnubg_native_version(void);

@@ -72,3 +72,21 @@
 "analysis.cancel" = "解析をキャンセル";
 "panel.legal_moves" = "合法手 · %d通り";
 "move.instructions" = "一覧から手を選ぶか、盤面で駒を動かしてください。一覧の数字は、手番プレイヤーから見た座標です。";
+
+/* Board interactions */
+"color.label" = "自分の色";
+"color.alternating" = "交互";
+"color.ivory" = "白";
+"color.charcoal" = "黒";
+"color.random" = "ランダム";
+"color.next_match" = "次に始めるマッチから適用します。盤面は自分の色を手前に表示します。";
+"dice.you" = "自分（%@）";
+"dice.opponent" = "相手（%@）";
+"dice.automatic" = "コンピューターが自動でロール";
+"dice.value" = "ダイスの目：%d";
+"dice.current" = "手番のダイス";
+"dice.previous" = "直近のロール";
+"bar.checkers" = "%@のバー：%d個";
+"move.preview" = "手のプレビュー（未確定）";
+"move.last_opponent" = "相手の直近の手：%@ · オレンジの輪で強調";
+"move.pass" = "強制パス";

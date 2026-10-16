@@ -34,6 +34,7 @@ See [ROADMAP.md](ROADMAP.md) for completed work, milestone acceptance criteria,
 and the current target: a usable macOS app through milestone 5.
 
 操作や機能の要望は [要望.txt](要望.txt) に1要望1行で追記できます。
+対応状況は [操作改善の記録](macos/INTERACTION.md) を参照してください。
 
 ## Run the macOS app
 
@@ -59,9 +60,13 @@ and next games. Match state and callbacks are exposed through
 
 The SwiftUI app adds a board with checker selection and move confirmation,
 a legal-move list, local human/computer opponents, match controls and analysis.
+The board includes a graphical bar, opponent-move highlights, dice on each
+player's side, legal-move hover previews and alternating/selectable player colors.
 The engine runs on one dedicated OS thread; cancellation can come from the UI.
 One active handle is supported, with process-owned evaluation resources.
 
 C regressions, Swift bundled-engine match execution and UI model tests pass.
-Actual GUI launch, rendered layout and mouse/keyboard verification remain
-pending because the agent execution environment fails macOS app registration.
+The user confirmed GUI launch and gameplay for the first app. New interaction
+changes pass model checks; their rendered layout and mouse/keyboard behavior
+still need visible verification because the agent environment cannot register
+GUI applications.

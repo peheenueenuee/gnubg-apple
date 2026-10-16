@@ -72,3 +72,21 @@
 "analysis.cancel" = "Cancel analysis";
 "panel.legal_moves" = "LEGAL MOVES · %d";
 "move.instructions" = "Choose a complete move here, or use the board. Points in this list use the moving player's coordinates.";
+
+/* Board interactions */
+"color.label" = "Your color";
+"color.alternating" = "Alternate";
+"color.ivory" = "Ivory";
+"color.charcoal" = "Charcoal";
+"color.random" = "Random";
+"color.next_match" = "Applies to the next new match; the board faces your color.";
+"dice.you" = "You (%@)";
+"dice.opponent" = "Opponent (%@)";
+"dice.automatic" = "Computer rolls automatically";
+"dice.value" = "Die: %d";
+"dice.current" = "Current roll";
+"dice.previous" = "Last completed roll";
+"bar.checkers" = "%@: %d checkers on the bar";
+"move.preview" = "Move preview · not played";
+"move.last_opponent" = "Last opponent move: %@ · orange rings";
+"move.pass" = "Forced pass";

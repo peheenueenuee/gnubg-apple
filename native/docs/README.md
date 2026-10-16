@@ -60,3 +60,15 @@ Multiple independent handles, core-library extraction, iOS builds, saved
 records and distribution packaging remain separate roadmap milestones.
 The local build still links desktop libraries and audio frameworks, but
 engine-owned sound is disabled during bootstrap.
+
+
+## Completed turn presentation (API version 3)
+
+`gnubg_native_last_turn` returns the most recent completed checker turn for a
+specified player in the current game, including exact dice and canonical steps.
+A forced pass has zero steps and still includes dice. Querying a player before
+their first completed turn returns NOT_READY. Cube decisions and analysis do not
+erase turn history; a new game or match starts with no completed turns.
+
+The query uses the same fixed engine thread as snapshots. It reads the engine's
+actual move records, so clients need not infer dice or moves from board changes.

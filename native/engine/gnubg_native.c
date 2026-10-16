@@ -590,6 +590,35 @@ gnubg_native_snapshot(const gnubg_native *engine,
     return GNUBG_NATIVE_OK;
 }
 
+gnubg_native_result
+gnubg_native_last_turn(const gnubg_native *engine, int8_t player,
+                        gnubg_native_turn *turn)
+{
+    if (!engine || engine != active_engine || engine_thread != g_thread_self() ||
+        !turn || player < 0 || player > 1)
+        return GNUBG_NATIVE_INVALID_ARGUMENT;
+    memset(turn, 0, sizeof(*turn));
+    if (ms.gs == GAME_NONE || !plGame || !plLastMove)
+        return GNUBG_NATIVE_NOT_READY;
+    for (const listOLD *entry = plLastMove; entry != plGame; entry = entry->plPrev) {
+        const moverecord *record = entry->p;
+        if (!record || record->mt == MOVE_GAMEINFO)
+            break;
+        if (record->mt != MOVE_NORMAL || record->fPlayer != player)
+            continue;
+        turn->player = player;
+        turn->dice[0] = record->anDice[0];
+        turn->dice[1] = record->anDice[1];
+        for (int step = 0; step < 4 && record->n.anMove[step * 2] >= 0; step++) {
+            turn->move.steps[step].from = record->n.anMove[step * 2];
+            turn->move.steps[step].to = record->n.anMove[step * 2 + 1];
+            turn->move.step_count++;
+        }
+        return GNUBG_NATIVE_OK;
+    }
+    return GNUBG_NATIVE_NOT_READY;
+}
+
 const char *
 gnubg_native_result_string(gnubg_native_result result)
 {
