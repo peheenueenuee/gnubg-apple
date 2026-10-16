@@ -18,8 +18,7 @@
 extern "C" {
 #endif
 
-#define GNUBG_NATIVE_API_VERSION 1
-#define GNUBG_NATIVE_MAX_MOVES 64
+#define GNUBG_NATIVE_API_VERSION 2
 #define GNUBG_NATIVE_ANALYSIS_OUTPUTS 7
 
 enum {
@@ -39,7 +38,8 @@ typedef enum {
     GNUBG_NATIVE_INVALID_ARGUMENT = 1,
     GNUBG_NATIVE_NOT_READY = 2,
     GNUBG_NATIVE_ILLEGAL_MOVE = 3,
-    GNUBG_NATIVE_ENGINE_ERROR = 4
+    GNUBG_NATIVE_ENGINE_ERROR = 4,
+    GNUBG_NATIVE_CANCELLED = 5
 } gnubg_native_result;
 
 typedef enum {
@@ -70,6 +70,13 @@ typedef struct {
     uint8_t game_over;
     uint32_t score[2];
     uint32_t match_length;
+    uint8_t match_over;
+    uint8_t crawford;
+    uint8_t resignation;
+    uint8_t can_double;
+    int8_t board_player;
+    uint8_t computer_turn;
+    uint32_t game_number;
 } gnubg_native_position;
 
 typedef struct {
@@ -84,7 +91,7 @@ typedef struct {
 } gnubg_native_move;
 
 typedef struct {
-    /* trials is reserved for rollout analysis; 0 requests a normal eval. */
+    /* 0 requests normal evaluation; 1..1000000 requests a fresh rollout. */
     uint32_t trials;
     uint8_t plies;
     uint8_t deterministic;
@@ -93,6 +100,8 @@ typedef struct {
 typedef struct {
     int8_t player;
     uint8_t plies;
+    uint32_t trials;
+    float standard_errors[GNUBG_NATIVE_ANALYSIS_OUTPUTS];
     /* Indexed by GNUBG_NATIVE_ANALYSIS_* constants above. */
     float outputs[GNUBG_NATIVE_ANALYSIS_OUTPUTS];
 } gnubg_native_analysis;
@@ -104,10 +113,12 @@ typedef struct {
     void *context;
 } gnubg_native_callbacks;
 
-/* The returned handle owns the active engine view and is not thread-safe.
+/* All calls except cancel must use the same OS thread as the first create,
+ * including later handle creation. A serial GCD queue alone is insufficient.
+ * The returned handle owns the active engine view and is not thread-safe.
  * The current upstream integration permits one active handle per process.
  * Destroy releases the match; evaluation resources remain process-owned and
- * are reused by later handles. Callbacks must not reenter or destroy a handle. */
+ * are reused by later handles. Callbacks must not reenter (except cancel) or destroy a handle. */
 gnubg_native *gnubg_native_create(gnubg_native_variation variation,
                                    const gnubg_native_callbacks *callbacks);
 void gnubg_native_destroy(gnubg_native *engine);
@@ -117,14 +128,36 @@ gnubg_native_result gnubg_native_start_match(gnubg_native *engine,
                                              gnubg_native_player player0,
                                              gnubg_native_player player1);
 /* OK also includes a forced pass. Rolling twice or on a computer turn
- * returns NOT_READY; computer turn execution is not implemented yet. */
+ * returns NOT_READY; use the COMPUTER_TURN action for computer players. */
 gnubg_native_result gnubg_native_roll(gnubg_native *engine);
 gnubg_native_result gnubg_native_play(gnubg_native *engine,
                                       const gnubg_native_move *move);
+typedef enum {
+    GNUBG_NATIVE_DOUBLE = 0,
+    GNUBG_NATIVE_TAKE = 1,
+    GNUBG_NATIVE_DROP = 2,
+    GNUBG_NATIVE_ACCEPT_RESIGNATION = 3,
+    GNUBG_NATIVE_REJECT_RESIGNATION = 4,
+    GNUBG_NATIVE_NEXT_GAME = 5,
+    GNUBG_NATIVE_COMPUTER_TURN = 6
+} gnubg_native_action;
+
+gnubg_native_result gnubg_native_act(gnubg_native *engine, gnubg_native_action action);
+gnubg_native_result gnubg_native_resign(gnubg_native *engine, uint8_t points);
+/* count receives the required capacity. NULL moves with capacity 0 queries it.
+ * Move coordinates are relative to the player on roll (board_player). */
+gnubg_native_result gnubg_native_legal_moves(gnubg_native *engine,
+    gnubg_native_move *moves, uint32_t capacity, uint32_t *count);
 gnubg_native_result gnubg_native_hint(gnubg_native *engine,
                                       gnubg_native_move *move);
 gnubg_native_result gnubg_native_analyse(gnubg_native *engine,
                                          const gnubg_native_analysis_settings *settings);
+/* Synchronous analysis. Callbacks run on the calling thread; progress is
+ * throttled by GNUbg (roughly every two seconds) plus initial/final updates.
+ * Cancelled work emits no analysis result; the return code is terminal status.
+ * Only cancel may run concurrently or from callbacks. Keep the handle alive
+ * until analyse returns. Idle cancellation is a no-op. */
+void gnubg_native_cancel(gnubg_native *engine);
 gnubg_native_result gnubg_native_snapshot(const gnubg_native *engine,
                                           gnubg_native_position *position);
 

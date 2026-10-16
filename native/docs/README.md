@@ -1,60 +1,62 @@
-# Native front end
+# Native engine boundary
 
-This directory is the platform-neutral boundary for the lightweight native
-application planned for GNU Backgammon.
+`native/include/gnubg_native.h` is the platform-neutral C ABI. It contains no
+GTK, GLib or Swift types. The adapter currently includes upstream `gnubg.c` as
+temporary integration glue; it is not yet an independently extracted core.
 
-## Targets
+## Lifetime and threading
 
-- macOS arm64: SwiftUI desktop application
-- iOS arm64: SwiftUI application
-- GNU Backgammon engine: C, built as a static library for each target
+One active handle is allowed per process. Every operation, including later
+handle creation, must run on the **same OS thread as the first create**.
+GNUbg allocates thread-local move buffers during bootstrap; serial GCD queues
+can switch OS threads and are insufficient. Wrong-thread calls are rejected.
+The macOS app therefore owns a persistent dedicated `Thread` and job queue.
 
-The UI must not include GTK headers or call GTK functions.  It talks to the
-engine only through `native/include/gnubg_native.h`, receives immutable
-position snapshots, and renders the board itself.  A single-threaded engine
-handle keeps the first version simple; analysis can later run on a worker
-queue and publish snapshots back to the UI thread.
+Destroy releases the match. Evaluation resources and GNUbg worker threads
+remain process-owned and can be reused by the next handle on that OS thread.
+Callbacks execute on the calling engine thread and may only reenter `cancel`.
+Do not destroy the handle until the current operation returns.
 
-## Deliberate first-version exclusions
+`gnubg_native_cancel` is the sole operation permitted from another thread.
+It interrupts active analysis; idle cancellation does nothing. The adapter
+requires GNUbg to be built with multithreading enabled.
 
-The native front end initially excludes GTK, the 3D board, Python, SQLite,
-and engine-owned audio.  Those are desktop concerns or platform adapters,
-and keeping them out of the core is what makes the arm64 macOS/iOS build
-small and deterministic.
+## Positions and matches
 
-The existing GTK application remains the reference desktop application while
-the native boundary is implemented incrementally.  No existing generated
-Autotools files should be regenerated as part of this work.
+Snapshot arrays use fixed player identities, matching `score`. Each player's
+points run from 23 toward 0, with bar 24 and borne-off destination -1 in moves.
+`board_player` identifies the player on roll; `turn` can instead identify a
+cube or resignation responder. `computer_turn` identifies a pending computer
+action, and `can_double` includes cube ownership, Crawford and dead-cube rules.
 
-## Implementation order
+The API supports match start, roll (including forced passes), legal move list
+query/copy, full move validation/application, hints, explicit computer turns,
+cube offer/take/drop, resignation offer/accept/reject, and next game.
+Automatic computer turns and next games are owned by the client, so snapshots
+remain visible at decision and game boundaries. Initial computer evaluations
+use 0-ply; adjustable computer strength is deferred.
 
-1. Separate the upstream process-oriented initialization from the reusable
-   engine state, then add an adapter that owns it behind `gnubg_native`.
-2. Move board updates and user-visible messages to callbacks/snapshots.
-3. Build a C smoke test without GTK.
-4. Add a Swift Package/Xcode target for macOS arm64.
-5. Add the iOS SwiftUI board and touch interaction using the same C target.
+## Analysis
 
-The ABI is intentionally C-compatible so Swift can import it directly and
-so the macOS and iOS targets cannot accidentally grow different game rules.
+`trials == 0` requests normal evaluation; `1..1000000` requests a fresh rollout.
+Settings apply to both players' rollout evaluations. Deterministic rollouts
+use a fixed seed. Rollouts currently run full games, with GNUbg's variance
+reduction and applicable bearoff database shortcuts.
 
-The first adapter keeps the existing engine state process-wide and therefore
-allows one active handle at a time. Match start, dice rolling, immutable
-snapshots, hint generation, and legal move application are wired through to
-the real engine. Move coordinates use GNUbg's engine points directly: `0..23`
-for points, `24` for the bar, and `-1` for borne off. Analysis remains
-available as a synchronous normal evaluation callback. Its seven outputs use
-the constants in `gnubg_native.h`; rollout trials remain reserved for the
-next analysis iteration. This limitation is deliberate while the upstream
-initialization lifecycle is being extracted.
+Analysis is synchronous. Run it on the engine thread, never the UI thread.
+Rollouts provide initial, periodic (approximately two-second) and final
+progress callbacks. Successful analysis emits seven outputs and rollout
+standard errors. Trial count is zero for normal evaluations.
 
-Position arrays use fixed player identities, matching `score`; each player's
-points run from 23 toward 0. This differs from the upstream rotating board.
-A successful roll can include a forced pass; clients should read a fresh
-snapshot. Repeated rolls and computer turns return `NOT_READY`.
+The return code supplies terminal status: OK, CANCELLED or ENGINE_ERROR.
+Cancelled work emits no final analysis callback or partial result. Worker
+completion is awaited and interrupt state cleared before returning, so the
+next analysis or match action can run safely. Analysis does not mutate the
+match. Cube and resignation decisions must be resolved before analysis.
 
-Destroy frees the match, while evaluation resources and worker infrastructure
-remain initialized for the process lifetime. The single active handle can be
-recreated. All calls must be serialized, and callbacks must not reenter or
-destroy the handle. Computer execution, cube decisions, and rollout progress
-and cancellation are not yet exposed.
+## Deferred work
+
+Multiple independent handles, core-library extraction, iOS builds, saved
+records and distribution packaging remain separate roadmap milestones.
+The local build still links desktop libraries and audio frameworks, but
+engine-owned sound is disabled during bootstrap.
