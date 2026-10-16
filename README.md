@@ -28,6 +28,11 @@ upstream = git://git.git.savannah.gnu.org/gnubg.git
 GNU Backgammon is GPLv3. Distribution of an application embedding or
 modifying the engine must comply with that license.
 
+## Roadmap
+
+See [ROADMAP.md](ROADMAP.md) for completed work, milestone acceptance criteria,
+and the current target: a usable macOS app through milestone 5.
+
 ## Current status
 
 The platform-neutral C boundary is defined in
