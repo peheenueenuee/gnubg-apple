@@ -100,3 +100,7 @@
 "board.instructions_short" = "Select a checker, then a highlighted destination.";
 "cube.description" = "Cube %u · %@";
 "cube.offered" = "Double offered at %d · Current ownership: %@";
+
+"panel.next_steps" = "NEXT STEP · %d choices";
+"move.step_instructions" = "Choose each step, then confirm. You can also use the board. Numbers use the moving player’s coordinates.";
+"tray.checkers" = "%@ storage: %d of 15 checkers";

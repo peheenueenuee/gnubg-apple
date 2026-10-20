@@ -2,7 +2,7 @@ import Foundation
 import SwiftUI
 import GNUbgNative
 
-struct Step: Equatable {
+struct Step: Hashable {
     let from: Int
     let to: Int
     var label: String { "\(from == 24 ? L10n.text("move.bar") : String(from + 1))/\(to < 0 ? L10n.text("move.off") : String(to + 1))" }
@@ -94,7 +94,6 @@ final class EngineModel: ObservableObject {
     @Published var colorChoice: PlayerColorChoice = .alternating
     @Published private(set) var humanPlayer = 0
     @Published private(set) var activeComputer = true
-    @Published private(set) var hoveredMove: Move?
     @Published private(set) var lastTurns: [TurnPresentation?] = [nil, nil]
     private struct MatchConfiguration {
         let humanPlayer: Int
@@ -172,7 +171,6 @@ final class EngineModel: ObservableObject {
                 self.activeComputer = configuration.computer
             }
             self.lastTurns = turns
-            self.hoveredMove = nil
             self.position = state
             self.moves = choices
             self.staged = []; self.source = nil
@@ -200,7 +198,7 @@ final class EngineModel: ObservableObject {
         return L10n.text(winner == humanPlayer ? "status.you_won" : "status.you_lost")
     }
     var usedDiceIndices: Set<Int> {
-        guard let position, !staged.isEmpty, hoveredMove == nil,
+        guard let position, !staged.isEmpty,
               let dice = diceValues(player: position.player) else { return [] }
         for candidate in candidates {
             if let assignment = DiceUsage.assignment(position: position, steps: candidate.steps, dice: dice) {
@@ -224,7 +222,7 @@ final class EngineModel: ObservableObject {
     }
     private func run(analysis: Bool = false, configuration: MatchConfiguration? = nil, _ action: @escaping (OpaquePointer) -> gnubg_native_result) {
         guard !busy, cancellationHandle != nil else { return }
-        busy = true; analysing = analysis; staged = []; source = nil; hoveredMove = nil
+        busy = true; analysing = analysis; staged = []; source = nil
         if !analysis { analysisText = L10n.text("analysis.empty") }
         if analysis { progress = 0; status = L10n.text("status.analysing") }
         queue.async {
@@ -251,7 +249,7 @@ final class EngineModel: ObservableObject {
     }
     func hint() {
         guard !busy else { return }
-        busy = true; hoveredMove = nil
+        busy = true
         queue.async {
             var value = gnubg_native_move()
             let result = gnubg_native_hint(self.handle, &value)
@@ -267,12 +265,23 @@ final class EngineModel: ObservableObject {
     }
     func cancel() { gnubg_native_cancel(cancellationHandle) }
     var candidates: [Move] { moves.filter { Array($0.steps.prefix(staged.count)) == staged } }
-    var nextSteps: [Step] { candidates.compactMap { $0.steps.count > staged.count ? $0.steps[staged.count] : nil } }
+    var nextSteps: [Step] {
+        var seen = Set<Step>()
+        return candidates.compactMap { move in
+            guard move.steps.count > staged.count else { return nil }
+            let step = move.steps[staged.count]
+            return seen.insert(step).inserted ? step : nil
+        }
+    }
+    func stage(_ step: Step) {
+        guard canInteractBoard, nextSteps.contains(step) else { return }
+        staged.append(step)
+        source = nil
+    }
     func select(_ point: Int) {
         guard canInteractBoard else { return }
-        hoveredMove = nil
         if let source, let step = nextSteps.first(where: { $0.from == source && $0.to == point }) {
-            staged.append(step); self.source = nil
+            stage(step)
         } else if nextSteps.contains(where: { $0.from == point }) { source = point }
         else { source = nil }
     }
@@ -303,15 +312,15 @@ final class EngineModel: ObservableObject {
         return !busy && p.game_over != 0 && p.match_over == 0 && p.match_length > 0
     }
     var canUndoSelection: Bool { !busy && (!staged.isEmpty || source != nil) }
-    var canConfirmMove: Bool { canInteractBoard && completeMove != nil && hoveredMove == nil }
+    var canConfirmMove: Bool { canInteractBoard && completeMove != nil }
     var canBearOff: Bool {
-        canInteractBoard && hoveredMove == nil && source != nil &&
+        canInteractBoard && source != nil &&
             nextSteps.contains { $0.from == source && $0.to == -1 }
     }
-    var displayPosition: Position? { position?.preview(hoveredMove?.steps ?? staged) }
+    var displayPosition: Position? { position?.preview(staged) }
     var lastOpponentTurn: TurnPresentation? { lastTurns[1 - humanPlayer] }
     func highlightedCheckers(player: Int, point: Int) -> Int {
-        guard hoveredMove == nil, staged.isEmpty, let turn = lastOpponentTurn,
+        guard staged.isEmpty, let turn = lastOpponentTurn,
               turn.player == player else { return 0 }
         return turn.move.finalDestinations[point, default: 0]
     }
@@ -326,12 +335,6 @@ final class EngineModel: ObservableObject {
         guard let p = position?.raw else { return false }
         return Int(p.board_player) == player && p.dice.0 > 0 && p.game_over == 0
     }
-    func hover(_ move: Move, active: Bool) {
-        if active {
-            guard canInteractBoard, moves.contains(where: { $0.id == move.id && $0.steps == move.steps }) else { return }
-            hoveredMove = move
-        } else if hoveredMove?.id == move.id { hoveredMove = nil }
-    }
-    func undoSelection() { staged = []; source = nil; hoveredMove = nil }
+    func undoSelection() { staged = []; source = nil }
     var completeMove: Move? { candidates.first { $0.steps == staged && !staged.isEmpty } }
 }

@@ -130,18 +130,30 @@ struct ContentView: View {
             }
             if model.canInteractBoard && !model.moves.isEmpty {
                 Divider()
-                Text(L10n.text("panel.legal_moves", model.moves.count)).font(.caption.weight(.bold)).foregroundColor(teal)
-                Text(L10n.text("move.instructions"))
+                Text(L10n.text("panel.next_steps", model.nextSteps.count)).font(.caption.weight(.bold)).foregroundColor(teal)
+                Text(L10n.text("move.step_instructions"))
                     .font(.caption).foregroundColor(.secondary)
+                if !model.staged.isEmpty {
+                    Text(model.staged.map(\.label).joined(separator: " · "))
+                        .font(.caption.monospacedDigit()).foregroundColor(teal)
+                }
+                HStack {
+                    if model.canUndoSelection {
+                        Button(L10n.text("board.undo")) { model.undoSelection() }
+                    }
+                    if model.canConfirmMove {
+                        Button(L10n.text("board.confirm")) { if let move = model.completeMove { model.play(move) } }
+                            .buttonStyle(.borderedProminent)
+                            .keyboardShortcut(.return, modifiers: [])
+                    }
+                }
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 6) {
-                        ForEach(model.moves) { move in
-                            Button(move.label) { model.play(move) }
-                                .font(.caption.monospacedDigit()).buttonStyle(.plain)
-                                .padding(6).frame(maxWidth: .infinity, alignment: .leading)
-                                .background(teal.opacity(0.07), in: RoundedRectangle(cornerRadius: 5))
-                                .onHover { model.hover(move, active: $0) }
-                                .onDisappear { model.hover(move, active: false) }
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 95))], spacing: 8) {
+                        ForEach(model.nextSteps, id: \.self) { step in
+                            Button(step.label) { model.stage(step) }
+                                .font(.callout.monospacedDigit())
+                                .buttonStyle(.bordered)
+                                .frame(maxWidth: .infinity)
                         }
                     }
                 }.frame(maxHeight: .infinity)

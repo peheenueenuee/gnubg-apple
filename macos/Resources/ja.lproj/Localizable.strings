@@ -100,3 +100,7 @@
 "board.instructions_short" = "駒を選び、強調表示された移動先を選んでください。";
 "cube.description" = "キューブ %u · %@";
 "cube.offered" = "%d倍へのダブルを提示中 · 現在の所有：%@";
+
+"panel.next_steps" = "今できる一手 · %d通り";
+"move.step_instructions" = "一手ずつ選び、最後に確定。盤上でも動かせます。数字は手番側の座標です。";
+"tray.checkers" = "%@の収納：%d個、全15個";

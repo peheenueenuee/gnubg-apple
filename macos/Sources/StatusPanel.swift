@@ -20,9 +20,6 @@ struct StatusPanel: View {
             } else if model.status != model.turnDescription {
                 Text(model.status).font(.callout).textSelection(.enabled)
             }
-            if model.hoveredMove != nil {
-                Label(L10n.text("move.preview"), systemImage: "eye").font(.caption).foregroundColor(teal)
-            }
             if let turn = model.lastOpponentTurn {
                 Divider()
                 Text(L10n.text("move.last_opponent", turn.move.steps.isEmpty ? L10n.text("move.pass") : turn.move.label))

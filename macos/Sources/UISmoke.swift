@@ -68,27 +68,6 @@ private func checkPresentationFixtures() {
     }
 }
 
-private func checkHover(_ model: EngineModel, move: Move) {
-    let original = model.position!
-    model.hover(move, active: true)
-    precondition(model.hoveredMove?.id == move.id)
-    precondition(model.displayPosition?.points == original.preview(move.steps).points)
-    precondition(model.position?.points == original.points && model.position?.bars == original.bars)
-    model.hover(move, active: false)
-    precondition(model.hoveredMove == nil && model.displayPosition?.points == original.points)
-    if let step = move.steps.first {
-        model.select(step.from); model.select(step.to)
-        let staged = model.staged
-        precondition(model.usedDiceIndices.count == staged.count)
-        model.hover(move, active: true)
-        precondition(model.staged == staged)
-        model.hover(move, active: false)
-        precondition(model.displayPosition?.points == original.preview(staged).points)
-        model.undoSelection()
-        precondition(model.usedDiceIndices.isEmpty)
-    }
-}
-
 func runUISmoke(render: Bool = true) {
     if render { _ = NSApplication.shared }
     checkPresentationFixtures()
@@ -102,7 +81,6 @@ func runUISmoke(render: Bool = true) {
     precondition(model.canResign && model.canHint && model.canAnalyse)
     precondition(!model.canOfferDouble && !model.canStartNextGame)
     precondition(!model.canConfirmMove && !model.canUndoSelection)
-    checkHover(model, move: move)
     let openingPlayer = model.position!.player
     let openingDice = model.diceValues(player: openingPlayer)
     for step in move.steps {
@@ -210,7 +188,7 @@ func runUISmoke(render: Bool = true) {
         precondition(model.matchResult == L10n.text(won ? "status.you_won" : "status.you_lost"))
     }
     print("Dice/result model OK: distinct dice, four doubles, exact/oversized bearoff, undo reset, win/loss outcomes")
-    print("Interaction model OK: hover isolation, bar/hit/off previews, last move/dice, alternating/fixed colors, charcoal vs computer")
+    print("Interaction model OK: bar/hit/off previews, last move/dice, alternating/fixed colors, charcoal vs computer")
     print("UI model smoke OK: checker selection, analysis, rollout, cancellation, recovery, full match")
     if !render { return }
     let view = NSHostingView(rootView: ContentView(model: model))

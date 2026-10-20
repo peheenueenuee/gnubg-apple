@@ -23,8 +23,8 @@ struct PointView: View {
     private var owner: Int { state.points[viewer][point] > 0 ? viewer : 1 - viewer }
     private var ownerPoint: Int { owner == viewer ? point : 23 - point }
     private var count: Int { state.points[owner][ownerPoint] }
-    private var destination: Bool { model.hoveredMove == nil && model.nextSteps.contains { $0.from == model.source && $0.to == ownPoint } }
-    private var selectable: Bool { model.canInteractBoard && model.hoveredMove == nil && model.nextSteps.contains { $0.from == ownPoint } }
+    private var destination: Bool { model.nextSteps.contains { $0.from == model.source && $0.to == ownPoint } }
+    private var selectable: Bool { model.canInteractBoard && model.nextSteps.contains { $0.from == ownPoint } }
     private var highlighted: Int { model.highlightedCheckers(player: owner, point: ownerPoint) }
     var body: some View {
         Button { model.select(ownPoint) } label: {
@@ -46,7 +46,7 @@ struct PointView: View {
                     }.padding(4)
                     if destination {
                         RoundedRectangle(cornerRadius: 6).stroke(Color.yellow, lineWidth: 3)
-                    } else if model.hoveredMove == nil && model.source == ownPoint {
+                    } else if model.source == ownPoint {
                         RoundedRectangle(cornerRadius: 6).stroke(Color.white, lineWidth: 3)
                     } else if selectable && model.staged.isEmpty {
                         RoundedRectangle(cornerRadius: 6).stroke(teal.opacity(0.5), lineWidth: 1)
@@ -144,7 +144,7 @@ struct BarView: View {
                 Text("\(state.bars[player])").font(.caption.monospacedDigit()).foregroundColor(.white)
             }
             .padding(4)
-            .background(model.hoveredMove == nil && state.player == player && model.source == 24 ? Color.orange.opacity(0.6) : .clear,
+            .background(state.player == player && model.source == 24 ? Color.orange.opacity(0.6) : .clear,
                         in: RoundedRectangle(cornerRadius: 7))
         }
         .buttonStyle(.plain)
@@ -162,6 +162,51 @@ struct BarView: View {
         .padding(.vertical, 12)
         .frame(width: 54)
         .frame(maxHeight: .infinity)
+        .background(Color(red: 0.32, green: 0.23, blue: 0.18), in: RoundedRectangle(cornerRadius: 8))
+    }
+}
+
+// Stored checkers are shown edge-on, like the rack on a physical board.
+struct OffTray: View {
+    @ObservedObject var model: EngineModel
+    let state: Position
+    private func rack(_ player: Int) -> some View {
+        VStack(spacing: 5) {
+            Text(L10n.player(player)).font(.caption2).foregroundColor(.white.opacity(0.8))
+            VStack(spacing: 3) {
+                ForEach(0..<state.off[player], id: \.self) { _ in
+                    Capsule()
+                        .fill(player == 0 ? Color(red: 0.98, green: 0.94, blue: 0.82) : ink)
+                        .overlay(Capsule().stroke(.black.opacity(0.4), lineWidth: 1))
+                        .frame(width: 32, height: 7)
+                }
+                Spacer(minLength: 0)
+            }.frame(height: 150)
+            Text("\(state.off[player]) / 15").font(.caption2.monospacedDigit()).foregroundColor(.white)
+        }
+        .padding(.vertical, 10).frame(width: 52)
+        .background(.black.opacity(0.2), in: RoundedRectangle(cornerRadius: 6))
+        .overlay(RoundedRectangle(cornerRadius: 6).stroke(
+            (model.canBearOff && state.player == player) || model.highlightedCheckers(player: player, point: -1) > 0
+                ? Color.orange : Color.white.opacity(0.15), lineWidth: 2))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(L10n.text("tray.checkers", L10n.player(player), state.off[player]))
+    }
+    @ViewBuilder private func storage(_ player: Int) -> some View {
+        if model.canBearOff && state.player == player {
+            Button { model.select(-1) } label: { rack(player) }
+                .buttonStyle(.plain).help(L10n.text("move.off"))
+        } else {
+            rack(player)
+        }
+    }
+    var body: some View {
+        VStack(spacing: 8) {
+            storage(1 - model.humanPlayer)
+            Spacer(minLength: 8)
+            storage(model.humanPlayer)
+        }
+        .padding(6)
         .background(Color(red: 0.32, green: 0.23, blue: 0.18), in: RoundedRectangle(cornerRadius: 8))
     }
 }
@@ -190,6 +235,7 @@ struct BoardView: View {
                 DicePanel(model: model, player: model.humanPlayer).frame(height: 100)
                 row(Array((0..<6).reversed()), top: false)
             }
+            OffTray(model: model, state: preview)
         }
         .padding(14)
         .background(Color(red: 0.91, green: 0.86, blue: 0.73), in: RoundedRectangle(cornerRadius: 14))
@@ -205,30 +251,6 @@ struct BoardView: View {
                 Text(L10n.text("board.score", L10n.player(model.humanPlayer), position.scores[model.humanPlayer]))
             }.font(.subheadline.weight(.semibold))
             board
-            HStack {
-                Text(L10n.text("board.instructions_short")).foregroundColor(.secondary)
-                Spacer()
-                Group {
-                    if model.canBearOff {
-                        Button(L10n.text("board.off", preview.off[0], preview.off[1])) { model.select(-1) }
-                            .tint(.orange)
-                    } else {
-                        Text(L10n.text("board.off", preview.off[0], preview.off[1]))
-                    }
-                }
-                .overlay(RoundedRectangle(cornerRadius: 5).stroke(
-                    model.highlightedCheckers(player: 1 - model.humanPlayer, point: -1) > 0 ? Color.orange : .clear, lineWidth: 2))
-            }.font(.caption)
-            HStack {
-                Spacer()
-                if model.canUndoSelection {
-                    Button(L10n.text("board.undo")) { model.undoSelection() }
-                }
-                if model.canConfirmMove {
-                    Button(L10n.text("board.confirm")) { if let move = model.completeMove { model.play(move) } }
-                        .keyboardShortcut(.return, modifiers: [])
-                }
-            }
         }
     }
 }

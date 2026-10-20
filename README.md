@@ -59,9 +59,9 @@ and next games. Match state and callbacks are exposed through
 [`native/include/gnubg_native.h`](native/include/gnubg_native.h).
 
 The SwiftUI app adds a board with checker selection and move confirmation,
-a legal-move list, local human/computer opponents, match controls and analysis.
+step-by-step legal move switches, local human/computer opponents, match controls and analysis.
 The board includes a graphical bar and doubling cube, opponent-move highlights,
-dice usage indicators (four dice for doubles), legal-move hover previews and
+dice usage indicators (four dice for doubles), a borne-off checker tray and
 alternating/selectable player colors. A status card groups turns, recent moves
 and match results.
 The engine runs on one dedicated OS thread; cancellation can come from the UI.
