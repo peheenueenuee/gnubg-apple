@@ -263,6 +263,28 @@ final class EngineModel: ObservableObject {
         return !busy && p.game_over == 0 && p.computer_turn == 0 &&
             Int(p.turn) == player && p.dice.0 == 0 && p.doubled == 0 && p.resignation == 0
     }
+    var canActInGame: Bool {
+        guard let p = position?.raw else { return false }
+        return !busy && p.game_over == 0 && p.computer_turn == 0
+    }
+    var canOfferDouble: Bool { canActInGame && position?.raw.can_double != 0 }
+    var canHint: Bool { canInteractBoard && !moves.isEmpty && staged.isEmpty }
+    var canResign: Bool {
+        canActInGame && position?.raw.doubled == 0 && position?.raw.resignation == 0
+    }
+    var canAnalyse: Bool { canResign && staged.isEmpty }
+    var canRespondToCube: Bool { canActInGame && position?.raw.doubled != 0 }
+    var canRespondToResignation: Bool { canActInGame && position?.raw.resignation != 0 }
+    var canStartNextGame: Bool {
+        guard let p = position?.raw else { return false }
+        return !busy && p.game_over != 0 && p.match_over == 0 && p.match_length > 0
+    }
+    var canUndoSelection: Bool { !busy && (!staged.isEmpty || source != nil) }
+    var canConfirmMove: Bool { canInteractBoard && completeMove != nil && hoveredMove == nil }
+    var canBearOff: Bool {
+        canInteractBoard && hoveredMove == nil && source != nil &&
+            nextSteps.contains { $0.from == source && $0.to == -1 }
+    }
     var displayPosition: Position? { position?.preview(hoveredMove?.steps ?? staged) }
     var lastOpponentTurn: TurnPresentation? { lastTurns[1 - humanPlayer] }
     func highlightedCheckers(player: Int, point: Int) -> Int {

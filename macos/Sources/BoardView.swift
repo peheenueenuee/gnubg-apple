@@ -8,6 +8,8 @@ struct CheckerView: View {
             .fill(player == 0 ? Color(red: 0.98, green: 0.94, blue: 0.82) : ink)
             .overlay(Circle().stroke(highlighted ? Color.orange : .black.opacity(0.3), lineWidth: highlighted ? 3 : 1))
             .shadow(color: highlighted ? .orange.opacity(0.65) : .black.opacity(0.12), radius: highlighted ? 4 : 1)
+            .frame(width: 32, height: 32)
+            .fixedSize()
     }
 }
 
@@ -32,16 +34,14 @@ struct PointView: View {
                     Triangle(top: top)
                         .fill(point.isMultiple(of: 2) ? teal.opacity(0.8) : Color(red: 0.75, green: 0.44, blue: 0.28))
                         .padding(.horizontal, 1)
-                    VStack(spacing: 2) {
-                        ForEach(0..<min(count, 5), id: \.self) { index in
-                            CheckerView(player: owner, highlighted: highlighted > 0 && index >= min(count, 5) - min(highlighted, 5))
+                    VStack(spacing: -10) {
+                        ForEach(0..<min(count, 4), id: \.self) { index in
+                            CheckerView(player: owner, highlighted: highlighted > 0 && index >= min(count, 4) - min(highlighted, 4))
                                 .overlay {
-                                    if index == 4 && count > 5 {
+                                    if index == 3 && count > 4 {
                                         Text("\(count)").font(.caption.bold()).foregroundColor(owner == 0 ? ink : .white)
                                     }
                                 }
-                                .frame(maxWidth: 34, maxHeight: 34)
-                                .aspectRatio(1, contentMode: .fit)
                         }
                     }.padding(4)
                     if destination {
@@ -100,22 +100,22 @@ struct DicePanel: View {
     @ObservedObject var model: EngineModel
     let player: Int
     private var values: [Int]? { model.diceValues(player: player) }
-    private var isComputer: Bool { player != model.humanPlayer && model.activeComputer }
     var body: some View {
         VStack(spacing: 6) {
             Text(L10n.text(player == model.humanPlayer ? "dice.you" : "dice.opponent", L10n.player(player)))
                 .font(.caption.weight(.bold))
-            if isComputer {
-                Text(L10n.text("dice.automatic")).font(.caption).frame(height: 24)
-            } else {
-                Button(L10n.text("game.roll")) { model.roll() }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(!model.canRoll(player: player))
-            }
-            HStack(spacing: 8) {
-                DieFace(value: values?.first, player: player)
-                DieFace(value: values?.last, player: player)
-            }
+            ZStack {
+                HStack(spacing: 8) {
+                    DieFace(value: values?.first, player: player)
+                    DieFace(value: values?.last, player: player)
+                }
+                .accessibilityHidden(model.canRoll(player: player))
+                if model.canRoll(player: player) {
+                    Button(L10n.text("game.roll")) { model.roll() }
+                        .buttonStyle(.borderedProminent)
+                        .shadow(color: .black.opacity(0.25), radius: 3, y: 2)
+                }
+            }.frame(height: 48)
             Text(L10n.text(model.diceAreCurrent(player: player) ? "dice.current" : (values == nil ? "board.awaiting_roll" : "dice.previous")))
                 .font(.caption2).foregroundColor(.secondary)
         }
@@ -131,11 +131,11 @@ struct BarView: View {
         Button { model.select(24) } label: {
             VStack(spacing: 4) {
                 ForEach(0..<min(state.bars[player], 4), id: \.self) { _ in
-                    CheckerView(player: player).frame(width: 28, height: 28)
+                    CheckerView(player: player)
                 }
                 if state.bars[player] == 0 {
                     Circle().stroke(.white.opacity(0.3), style: StrokeStyle(lineWidth: 1, dash: [3]))
-                        .frame(width: 28, height: 28)
+                        .frame(width: 32, height: 32)
                 }
                 Text("\(state.bars[player])").font(.caption.monospacedDigit()).foregroundColor(.white)
             }
@@ -208,11 +208,16 @@ struct BoardView: View {
                     Text(L10n.text("board.instructions", L10n.player(position.player))).foregroundColor(.secondary)
                 }
                 Spacer()
-                Button(L10n.text("board.off", preview.off[0], preview.off[1])) { model.select(-1) }
-                    .tint(model.nextSteps.contains { $0.from == model.source && $0.to == -1 } ? .orange : teal)
-                    .overlay(RoundedRectangle(cornerRadius: 5).stroke(
-                        model.highlightedCheckers(player: 1 - model.humanPlayer, point: -1) > 0 ? Color.orange : .clear, lineWidth: 2))
-                    .disabled(!model.canInteractBoard)
+                Group {
+                    if model.canBearOff {
+                        Button(L10n.text("board.off", preview.off[0], preview.off[1])) { model.select(-1) }
+                            .tint(.orange)
+                    } else {
+                        Text(L10n.text("board.off", preview.off[0], preview.off[1]))
+                    }
+                }
+                .overlay(RoundedRectangle(cornerRadius: 5).stroke(
+                    model.highlightedCheckers(player: 1 - model.humanPlayer, point: -1) > 0 ? Color.orange : .clear, lineWidth: 2))
             }.font(.caption)
             HStack {
                 if let turn = model.lastOpponentTurn {
@@ -220,11 +225,13 @@ struct BoardView: View {
                         .font(.caption).foregroundColor(.secondary).lineLimit(2)
                 }
                 Spacer()
-                Button(L10n.text("board.undo")) { model.undoSelection() }
-                    .disabled(model.busy || (model.staged.isEmpty && model.source == nil))
-                Button(L10n.text("board.confirm")) { if let move = model.completeMove { model.play(move) } }
-                    .keyboardShortcut(.return, modifiers: [])
-                    .disabled(model.completeMove == nil || model.busy || model.hoveredMove != nil)
+                if model.canUndoSelection {
+                    Button(L10n.text("board.undo")) { model.undoSelection() }
+                }
+                if model.canConfirmMove {
+                    Button(L10n.text("board.confirm")) { if let move = model.completeMove { model.play(move) } }
+                        .keyboardShortcut(.return, modifiers: [])
+                }
             }
         }
     }

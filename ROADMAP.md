@@ -1,6 +1,6 @@
 # GNUbg Apple roadmap
 
-Updated: 2026-10-16
+Updated: 2026-10-20
 
 ## Goal and working agreement
 
@@ -29,7 +29,7 @@ not by itself authorize implementing all later milestones.
 | 4. Complete match lifecycle | Computer turns, cube offer/take/drop, resignation and response, next game and match end | A client can complete a match through the C API with correct scores and terminal states | Complete |
 | 5. First usable macOS app | Swift integration, serialized engine execution, SwiftUI board and checker interaction, hints and analysis | Launch a native app, complete a local match, and run/cancel analysis while the UI stays responsive | User confirmed GUI launch and gameplay; remaining acceptance checks below |
 | 5.1. Japanese localization | Japanese UI, consistent backgammon terms, localized status/errors and analysis labels; retain English | Follow the system language, with readable Japanese across match and analysis flows and English fallback | Implemented; language/model checks pass, visual text layout pending |
-| 5.2. Interaction polish | Clearer move guidance, undoing staged selections, board orientation/labels, resizing and accessibility | Common and edge-case game actions are understandable and usable in both languages | First pass implemented from six user requests; model checks pass, visible interaction feedback pending |
+| 5.2. Interaction polish | Clearer move guidance, undoing staged selections, board orientation/labels, resizing and accessibility | Common and edge-case game actions are understandable and usable in both languages | Two passes implemented from user requests; state/model checks pass, latest visible feedback pending |
 | 6. Records and usability | Save/load, history navigation, analysis presentation, preferences | Close and reopen a saved match and navigate its record | Later |
 | 6.1. Analysis and opponent settings | Adjustable computer strength, evaluation depth, rollout options and clearer result explanations | Settings affect actual engine behavior; clients can understand the result perspective and accuracy/cost tradeoffs | Planned |
 | 7. iPhone and iPad | iOS engine build and bundled resources, touch input and adaptive layout | Run the same rules and analysis on physical iOS/iPadOS devices | Later |
@@ -65,6 +65,10 @@ not by itself authorize implementing all later milestones.
   graphical bar, opponent move highlights, prominent left/right dice, roll button
   above the dice, hover previews and alternating/selectable player colors.
   See `macos/INTERACTION.md` for per-request status and remaining visible checks.
+- The 2026-10-20 follow-up fixes checker dimensions, overlaps/counts crowded
+  stacks, overlays roll controls only when actionable, and shows other controls
+  according to game/selection/analysis state. New-match preferences live in a
+  popover instead of the permanent toolbar. Visual verification remains pending.
 - Validation logs are retained under `.build/logs/` after this implementation run.
 
 ## Remaining acceptance work for milestone 5

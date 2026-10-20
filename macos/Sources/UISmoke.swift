@@ -84,6 +84,9 @@ func runUISmoke(render: Bool = true) {
     waitForIdle(model)
     precondition(model.humanPlayer == 1, "The next match should alternate to charcoal")
     guard let move = model.moves.first else { fatalError("No opening legal moves") }
+    precondition(model.canResign && model.canHint && model.canAnalyse)
+    precondition(!model.canOfferDouble && !model.canStartNextGame)
+    precondition(!model.canConfirmMove && !model.canUndoSelection)
     checkHover(model, move: move)
     let openingPlayer = model.position!.player
     let openingDice = model.diceValues(player: openingPlayer)
@@ -91,6 +94,7 @@ func runUISmoke(render: Bool = true) {
         model.select(step.from)
         model.select(step.to)
     }
+    precondition(model.canConfirmMove && model.canUndoSelection && !model.canAnalyse)
     precondition(model.completeMove?.steps == move.steps, "Checker selection failed")
     model.play(model.completeMove!)
     waitForIdle(model)
@@ -102,6 +106,11 @@ func runUISmoke(render: Bool = true) {
     precondition(!model.moves.isEmpty)
     model.play(model.moves[0]); waitForIdle(model)
     precondition(model.lastTurns.allSatisfy { $0 != nil })
+    precondition(model.canOfferDouble)
+    model.act(GNUBG_NATIVE_DOUBLE); waitForIdle(model)
+    precondition(model.canRespondToCube && !model.canResign && !model.canAnalyse && !model.canHint)
+    model.act(GNUBG_NATIVE_TAKE); waitForIdle(model)
+    precondition(!model.canRespondToCube)
     let opponent = model.lastOpponentTurn!
     precondition(opponent.player == 1 - model.humanPlayer)
     precondition(model.diceValues(player: opponent.player) == opponent.dice)
@@ -109,6 +118,7 @@ func runUISmoke(render: Bool = true) {
         precondition(model.highlightedCheckers(player: opponent.player, point: point) == count)
     }
     model.analyse(rollout: false)
+    precondition(model.analysing && !model.canAnalyse && !model.canHint && !model.canResign)
     waitForIdle(model)
     precondition(model.analysisText.contains(L10n.text("analysis.normal_detail")))
     model.trials = 4
@@ -121,6 +131,7 @@ func runUISmoke(render: Bool = true) {
     waitForIdle(model)
     precondition(model.status == L10n.text("status.cancelled"), model.status)
     model.analyse(rollout: false)
+    precondition(model.analysing && !model.canAnalyse && !model.canHint && !model.canResign)
     waitForIdle(model)
     precondition(model.analysisText.contains(L10n.text("analysis.normal_detail")))
     model.trials = 4
@@ -135,13 +146,20 @@ func runUISmoke(render: Bool = true) {
     model.resign(1)
     waitForIdle(model)
     precondition(model.position?.raw.resignation == 1)
+    precondition(model.canRespondToResignation && !model.canResign && !model.canAnalyse && !model.canHint)
     model.act(GNUBG_NATIVE_ACCEPT_RESIGNATION)
     waitForIdle(model)
     precondition(model.position?.raw.match_over != 0)
+    precondition(!model.canStartNextGame && !model.canResign && !model.canAnalyse && !model.canHint)
     precondition(model.position?.raw.resignation == 0)
     model.matchLength = 3
     model.newMatch()
     waitForIdle(model)
+    model.resign(1); waitForIdle(model)
+    model.act(GNUBG_NATIVE_ACCEPT_RESIGNATION); waitForIdle(model)
+    precondition(model.canStartNextGame)
+    model.act(GNUBG_NATIVE_NEXT_GAME); waitForIdle(model)
+    precondition(!model.canStartNextGame)
     model.colorChoice = .ivory
     model.newMatch(); waitForIdle(model)
     precondition(model.humanPlayer == 0)

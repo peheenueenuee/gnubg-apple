@@ -22,6 +22,7 @@ struct ContentView: View {
     init() { _model = StateObject(wrappedValue: EngineModel()) }
     init(model: EngineModel) { _model = StateObject(wrappedValue: model) }
     @State private var confirmNew = false
+    @State private var showMatchSettings = false
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             HStack {
@@ -30,14 +31,26 @@ struct ContentView: View {
                     Text(L10n.text("app.tagline")).foregroundColor(.secondary)
                 }
                 Spacer()
-                Picker(L10n.text("match.label"), selection: $model.matchLength) {
-                    ForEach([1, 3, 5, 7, 11], id: \.self) { Text(L10n.text("match.points", $0)).tag($0) }
-                }.frame(width: 160)
-                Picker(L10n.text("color.label"), selection: $model.colorChoice) {
-                    ForEach(PlayerColorChoice.allCases) { choice in Text(choice.label).tag(choice) }
-                }.frame(width: 170).help(L10n.text("color.next_match"))
-                Toggle(L10n.text("match.computer"), isOn: $model.computer).toggleStyle(.checkbox)
-                Button(L10n.text("match.new")) { confirmNew = true }.disabled(model.busy)
+                if !model.busy {
+                    Button(L10n.text("match.new")) { showMatchSettings = true }
+                        .popover(isPresented: $showMatchSettings) {
+                            VStack(alignment: .leading, spacing: 16) {
+                                Text(L10n.text("match.new")).font(.headline)
+                                Picker(L10n.text("match.label"), selection: $model.matchLength) {
+                                    ForEach([1, 3, 5, 7, 11], id: \.self) { Text(L10n.text("match.points", $0)).tag($0) }
+                                }
+                                Picker(L10n.text("color.label"), selection: $model.colorChoice) {
+                                    ForEach(PlayerColorChoice.allCases) { choice in Text(choice.label).tag(choice) }
+                                }.help(L10n.text("color.next_match"))
+                                Toggle(L10n.text("match.computer"), isOn: $model.computer)
+                                Button(L10n.text("match.start")) {
+                                    showMatchSettings = false
+                                    if model.position?.raw.match_over == 1 { model.newMatch() }
+                                    else { confirmNew = true }
+                                }.buttonStyle(.borderedProminent)
+                            }.padding(20).frame(width: 320)
+                        }
+                }
             }
             HStack(alignment: .top, spacing: 22) {
                 if let position = model.position {
@@ -59,6 +72,9 @@ struct ContentView: View {
         .background(Color(red: 0.97, green: 0.96, blue: 0.93))
         .tint(teal)
         .preferredColorScheme(.light)
+        .onChange(of: model.busy) { _, busy in
+            if busy { showMatchSettings = false }
+        }
         .confirmationDialog(L10n.text("match.confirm_new"), isPresented: $confirmNew) {
             Button(L10n.text("match.start")) { model.newMatch() }
             Button(L10n.text("app.cancel"), role: .cancel) {}
@@ -66,9 +82,6 @@ struct ContentView: View {
     }
     @ViewBuilder private var sidebar: some View {
         let p = model.position?.raw
-        let playing = p?.game_over == 0
-        let human = p?.computer_turn == 0
-        let decision = p?.doubled != 0 || p?.resignation != 0
         VStack(alignment: .leading, spacing: 14) {
             Text(L10n.text("panel.table")).font(.caption.weight(.bold)).foregroundColor(teal)
             Text(model.turnDescription).font(.headline)
@@ -77,65 +90,69 @@ struct ContentView: View {
                 Spacer()
                 Text(p?.cube_owner == -1 ? L10n.text("cube.centered") : L10n.text("cube.owner", L10n.player(Int(p?.cube_owner ?? 0)))).font(.caption)
             }
-            if p?.doubled != 0 {
+            if model.canRespondToCube {
                 HStack {
                     Button(L10n.text("cube.take")) { model.act(GNUBG_NATIVE_TAKE) }
                     Button(L10n.text("cube.drop")) { model.act(GNUBG_NATIVE_DROP) }
-                }.disabled(model.busy || !human)
-            } else if p?.resignation != 0 {
+                }
+            } else if model.canRespondToResignation {
                 HStack {
                     Button(L10n.text("resign.accept")) { model.act(GNUBG_NATIVE_ACCEPT_RESIGNATION) }
                     Button(L10n.text("resign.reject")) { model.act(GNUBG_NATIVE_REJECT_RESIGNATION) }
-                }.disabled(model.busy || !human)
-            } else if p?.game_over != 0 {
+                }
+            } else if model.canStartNextGame {
                 Button(L10n.text("match.next_game")) { model.act(GNUBG_NATIVE_NEXT_GAME) }
-                    .disabled(model.busy || p?.match_over != 0)
             } else {
                 HStack {
-                    Button(L10n.text("cube.double")) { model.act(GNUBG_NATIVE_DOUBLE) }
-                        .disabled(model.busy || !human || p?.can_double == 0)
-                }
-                HStack {
-                    Button(L10n.text("game.hint")) { model.hint() }.disabled(model.busy || !human || model.moves.isEmpty)
-                    Menu(L10n.text("game.resign")) {
-                        ForEach(1...3, id: \.self) { points in Button(L10n.text("resign.points", points)) { model.resign(points) } }
-                    }.disabled(model.busy || !human)
-                }
-                if !human {
-                    Button(L10n.text("game.computer_turn")) { model.act(GNUBG_NATIVE_COMPUTER_TURN) }.disabled(model.busy)
-                }
-            }
-            Divider()
-            Text(L10n.text("panel.analysis")).font(.caption.weight(.bold)).foregroundColor(teal)
-            Text(model.analysisText).font(.callout.monospacedDigit()).textSelection(.enabled)
-            Picker(L10n.text("analysis.trials"), selection: $model.trials) {
-                ForEach([36, 1296, 5184], id: \.self) { Text(L10n.text("analysis.trial_count", $0)).tag($0) }
-            }.disabled(model.busy)
-            HStack {
-                Button(L10n.text("analysis.evaluate")) { model.analyse(rollout: false) }
-                Button(L10n.text("analysis.rollout")) { model.analyse(rollout: true) }
-            }.disabled(model.busy || !playing || decision)
-            if model.analysing {
-                ProgressView(value: model.progress)
-                Button(L10n.text("analysis.cancel")) { model.cancel() }
-            }
-            Divider()
-            Text(L10n.text("panel.legal_moves", model.moves.count)).font(.caption.weight(.bold)).foregroundColor(teal)
-            Text(L10n.text("move.instructions"))
-                .font(.caption).foregroundColor(.secondary)
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 6) {
-                    ForEach(model.moves) { move in
-                        Button(move.label) { model.play(move) }
-                            .font(.caption.monospacedDigit()).buttonStyle(.plain)
-                            .padding(6).frame(maxWidth: .infinity, alignment: .leading)
-                            .background(teal.opacity(0.07), in: RoundedRectangle(cornerRadius: 5))
-                            .disabled(model.busy || !human)
-                            .onHover { model.hover(move, active: $0) }
-                            .onDisappear { model.hover(move, active: false) }
+                    if model.canOfferDouble {
+                        Button(L10n.text("cube.double")) { model.act(GNUBG_NATIVE_DOUBLE) }
+                    }
+                    if model.canHint {
+                        Button(L10n.text("game.hint")) { model.hint() }
+                    }
+                    if model.canResign {
+                        Menu(L10n.text("game.resign")) {
+                            ForEach(1...3, id: \.self) { points in Button(L10n.text("resign.points", points)) { model.resign(points) } }
+                        }
                     }
                 }
-            }.frame(maxHeight: .infinity)
+            }
+            if model.canAnalyse || model.analysing || model.analysisText != L10n.text("analysis.empty") {
+                Divider()
+                Text(L10n.text("panel.analysis")).font(.caption.weight(.bold)).foregroundColor(teal)
+                Text(model.analysisText).font(.callout.monospacedDigit()).textSelection(.enabled)
+                if model.canAnalyse {
+                    Picker(L10n.text("analysis.trials"), selection: $model.trials) {
+                        ForEach([36, 1296, 5184], id: \.self) { Text(L10n.text("analysis.trial_count", $0)).tag($0) }
+                    }
+                    HStack {
+                        Button(L10n.text("analysis.evaluate")) { model.analyse(rollout: false) }
+                        Button(L10n.text("analysis.rollout")) { model.analyse(rollout: true) }
+                    }
+                }
+                if model.analysing {
+                    ProgressView(value: model.progress)
+                    Button(L10n.text("analysis.cancel")) { model.cancel() }
+                }
+            }
+            if model.canInteractBoard && !model.moves.isEmpty {
+                Divider()
+                Text(L10n.text("panel.legal_moves", model.moves.count)).font(.caption.weight(.bold)).foregroundColor(teal)
+                Text(L10n.text("move.instructions"))
+                    .font(.caption).foregroundColor(.secondary)
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 6) {
+                        ForEach(model.moves) { move in
+                            Button(move.label) { model.play(move) }
+                                .font(.caption.monospacedDigit()).buttonStyle(.plain)
+                                .padding(6).frame(maxWidth: .infinity, alignment: .leading)
+                                .background(teal.opacity(0.07), in: RoundedRectangle(cornerRadius: 5))
+                                .onHover { model.hover(move, active: $0) }
+                                .onDisappear { model.hover(move, active: false) }
+                        }
+                    }
+                }.frame(maxHeight: .infinity)
+            }
         }
     }
 }
