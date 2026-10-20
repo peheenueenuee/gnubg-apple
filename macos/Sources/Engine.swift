@@ -190,6 +190,29 @@ final class EngineModel: ObservableObject {
             }
         }
     }
+    var didHumanWin: Bool? {
+        guard let p = position, p.raw.match_over != 0 else { return nil }
+        return (p.scores[0] > p.scores[1] ? 0 : 1) == humanPlayer
+    }
+    var matchResult: String? {
+        guard let p = position, p.raw.match_over != 0 else { return nil }
+        let winner = p.scores[0] > p.scores[1] ? 0 : 1
+        return L10n.text(winner == humanPlayer ? "status.you_won" : "status.you_lost")
+    }
+    var usedDiceIndices: Set<Int> {
+        guard let position, !staged.isEmpty, hoveredMove == nil,
+              let dice = diceValues(player: position.player) else { return [] }
+        for candidate in candidates {
+            if let assignment = DiceUsage.assignment(position: position, steps: candidate.steps, dice: dice) {
+                return Set(assignment.prefix(staged.count))
+            }
+        }
+        return []
+    }
+    func displayedDice(player: Int) -> [Int?] {
+        guard let dice = diceValues(player: player) else { return [nil, nil] }
+        return DiceUsage.expanded(dice).map { Optional($0) }
+    }
     var turnDescription: String {
         guard let p = position else { return L10n.text("error.unavailable") }
         if p.raw.match_over != 0 { return L10n.text("status.match_complete", L10n.player(p.scores[0] > p.scores[1] ? 0 : 1)) }

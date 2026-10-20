@@ -54,15 +54,15 @@ struct ContentView: View {
             }
             HStack(alignment: .top, spacing: 22) {
                 if let position = model.position {
-                    BoardView(model: model, position: position)
+                    ScrollView(.vertical) {
+                        BoardView(model: model, position: position).frame(maxWidth: .infinity)
+                    }
                 } else {
                     ProgressView(L10n.text("board.preparing")).frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
                 sidebar.frame(width: 245)
             }
             HStack(spacing: 10) {
-                Circle().fill(model.busy ? Color.orange : teal).frame(width: 8, height: 8)
-                Text(model.status).font(.callout).textSelection(.enabled)
                 Spacer()
                 Text(L10n.text("app.offline", String(cString: gnubg_native_version()))).font(.caption).foregroundColor(.secondary)
             }
@@ -81,15 +81,8 @@ struct ContentView: View {
         }
     }
     @ViewBuilder private var sidebar: some View {
-        let p = model.position?.raw
         VStack(alignment: .leading, spacing: 14) {
-            Text(L10n.text("panel.table")).font(.caption.weight(.bold)).foregroundColor(teal)
-            Text(model.turnDescription).font(.headline)
-            HStack {
-                Text(L10n.text("cube.value", p?.cube_value ?? 1)).font(.title2.bold())
-                Spacer()
-                Text(p?.cube_owner == -1 ? L10n.text("cube.centered") : L10n.text("cube.owner", L10n.player(Int(p?.cube_owner ?? 0)))).font(.caption)
-            }
+            StatusPanel(model: model)
             if model.canRespondToCube {
                 HStack {
                     Button(L10n.text("cube.take")) { model.act(GNUBG_NATIVE_TAKE) }
@@ -161,6 +154,7 @@ struct GNUbgApp: App {
     var body: some Scene {
         Window("GNUbg Apple", id: "main") { ContentView() }
         .windowStyle(.titleBar)
+        .defaultSize(width: 1180, height: 860)
         .commands { CommandGroup(replacing: .newItem) {} }
     }
 }

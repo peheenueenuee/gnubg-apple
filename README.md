@@ -60,8 +60,10 @@ and next games. Match state and callbacks are exposed through
 
 The SwiftUI app adds a board with checker selection and move confirmation,
 a legal-move list, local human/computer opponents, match controls and analysis.
-The board includes a graphical bar, opponent-move highlights, dice on each
-player's side, legal-move hover previews and alternating/selectable player colors.
+The board includes a graphical bar and doubling cube, opponent-move highlights,
+dice usage indicators (four dice for doubles), legal-move hover previews and
+alternating/selectable player colors. A status card groups turns, recent moves
+and match results.
 The engine runs on one dedicated OS thread; cancellation can come from the UI.
 One active handle is supported, with process-owned evaluation resources.
 

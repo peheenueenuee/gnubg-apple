@@ -34,11 +34,11 @@ struct PointView: View {
                     Triangle(top: top)
                         .fill(point.isMultiple(of: 2) ? teal.opacity(0.8) : Color(red: 0.75, green: 0.44, blue: 0.28))
                         .padding(.horizontal, 1)
-                    VStack(spacing: -10) {
-                        ForEach(0..<min(count, 4), id: \.self) { index in
-                            CheckerView(player: owner, highlighted: highlighted > 0 && index >= min(count, 4) - min(highlighted, 4))
+                    VStack(spacing: 2) {
+                        ForEach(0..<min(count, 5), id: \.self) { index in
+                            CheckerView(player: owner, highlighted: highlighted > 0 && index >= min(count, 5) - min(highlighted, 5))
                                 .overlay {
-                                    if index == 3 && count > 4 {
+                                    if index == 4 && count > 5 {
                                         Text("\(count)").font(.caption.bold()).foregroundColor(owner == 0 ? ink : .white)
                                     }
                                 }
@@ -65,6 +65,7 @@ struct PointView: View {
 struct DieFace: View {
     let value: Int?
     let player: Int
+    var used = false
     private var pips: [(CGFloat, CGFloat)] {
         switch value {
         case 1: return [(0.5, 0.5)]
@@ -80,11 +81,11 @@ struct DieFace: View {
         GeometryReader { geometry in
             ZStack {
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(player == 0 ? Color.white : ink)
+                    .fill(used ? Color.gray.opacity(0.3) : (player == 0 ? Color.white : ink))
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(.black.opacity(0.3), lineWidth: 1))
                     .shadow(color: .black.opacity(0.18), radius: 2, y: 2)
                 ForEach(pips.indices, id: \.self) { index in
-                    Circle().fill(player == 0 ? ink : Color.white)
+                    Circle().fill(used ? Color.gray : (player == 0 ? ink : Color.white))
                         .frame(width: 7, height: 7)
                         .position(x: geometry.size.width * pips[index].0, y: geometry.size.height * pips[index].1)
                 }
@@ -92,7 +93,8 @@ struct DieFace: View {
             }
         }
         .frame(width: 42, height: 42)
-        .accessibilityLabel(value.map { L10n.text("dice.value", $0) } ?? L10n.text("board.awaiting_roll"))
+        .opacity(used ? 0.6 : 1)
+        .accessibilityLabel(value.map { L10n.text(used ? "dice.used_value" : "dice.value", $0) } ?? L10n.text("board.awaiting_roll"))
     }
 }
 
@@ -106,8 +108,10 @@ struct DicePanel: View {
                 .font(.caption.weight(.bold))
             ZStack {
                 HStack(spacing: 8) {
-                    DieFace(value: values?.first, player: player)
-                    DieFace(value: values?.last, player: player)
+                    ForEach(model.displayedDice(player: player).indices, id: \.self) { index in
+                        DieFace(value: model.displayedDice(player: player)[index], player: player,
+                                used: model.diceAreCurrent(player: player) && model.usedDiceIndices.contains(index))
+                    }
                 }
                 .accessibilityHidden(model.canRoll(player: player))
                 if model.canRoll(player: player) {
@@ -151,7 +155,7 @@ struct BarView: View {
         VStack(spacing: 6) {
             stack(player: 1 - model.humanPlayer)
             Spacer(minLength: 6)
-            Text(L10n.text("move.bar")).font(.caption.weight(.bold)).foregroundColor(.white)
+            CubeView(model: model, state: state)
             Spacer(minLength: 6)
             stack(player: model.humanPlayer)
         }
@@ -171,19 +175,19 @@ struct BoardView: View {
             ForEach(points, id: \.self) { point in
                 PointView(point: point, top: top, state: preview, model: model)
             }
-        }.frame(minHeight: 125)
+        }.frame(minHeight: 195)
     }
     private var board: some View {
         HStack(spacing: 10) {
             VStack(spacing: 8) {
                 row(Array(12..<18), top: true)
-                DicePanel(model: model, player: 1 - model.humanPlayer).frame(height: 135)
+                DicePanel(model: model, player: 1 - model.humanPlayer).frame(height: 100)
                 row(Array((6..<12).reversed()), top: false)
             }
             BarView(model: model, state: preview)
             VStack(spacing: 8) {
                 row(Array(18..<24), top: true)
-                DicePanel(model: model, player: model.humanPlayer).frame(height: 135)
+                DicePanel(model: model, player: model.humanPlayer).frame(height: 100)
                 row(Array((0..<6).reversed()), top: false)
             }
         }
@@ -202,11 +206,7 @@ struct BoardView: View {
             }.font(.subheadline.weight(.semibold))
             board
             HStack {
-                if model.hoveredMove != nil {
-                    Label(L10n.text("move.preview"), systemImage: "eye").foregroundColor(teal)
-                } else {
-                    Text(L10n.text("board.instructions", L10n.player(position.player))).foregroundColor(.secondary)
-                }
+                Text(L10n.text("board.instructions_short")).foregroundColor(.secondary)
                 Spacer()
                 Group {
                     if model.canBearOff {
@@ -220,10 +220,6 @@ struct BoardView: View {
                     model.highlightedCheckers(player: 1 - model.humanPlayer, point: -1) > 0 ? Color.orange : .clear, lineWidth: 2))
             }.font(.caption)
             HStack {
-                if let turn = model.lastOpponentTurn {
-                    Text(L10n.text("move.last_opponent", turn.move.steps.isEmpty ? L10n.text("move.pass") : turn.move.label))
-                        .font(.caption).foregroundColor(.secondary).lineLimit(2)
-                }
                 Spacer()
                 if model.canUndoSelection {
                     Button(L10n.text("board.undo")) { model.undoSelection() }

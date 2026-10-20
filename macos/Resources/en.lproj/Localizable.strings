@@ -90,3 +90,13 @@
 "move.preview" = "Move preview · not played";
 "move.last_opponent" = "Last opponent move: %@ · orange rings";
 "move.pass" = "Forced pass";
+
+/* Cube, dice usage and consolidated status */
+"panel.status" = "STATUS";
+"status.working" = "Working…";
+"status.you_won" = "You won!";
+"status.you_lost" = "You lost.";
+"dice.used_value" = "Used die: %d";
+"board.instructions_short" = "Select a checker, then a highlighted destination.";
+"cube.description" = "Cube %u · %@";
+"cube.offered" = "Double offered at %d · Current ownership: %@";

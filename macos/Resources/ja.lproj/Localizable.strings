@@ -90,3 +90,13 @@
 "move.preview" = "手のプレビュー（未確定）";
 "move.last_opponent" = "相手の直近の手：%@ · オレンジの輪で強調";
 "move.pass" = "強制パス";
+
+/* Cube, dice usage and consolidated status */
+"panel.status" = "状況";
+"status.working" = "処理中…";
+"status.you_won" = "勝ちました！";
+"status.you_lost" = "負けました。";
+"dice.used_value" = "使用済みのダイス：%d";
+"board.instructions_short" = "駒を選び、強調表示された移動先を選んでください。";
+"cube.description" = "キューブ %u · %@";
+"cube.offered" = "%d倍へのダブルを提示中 · 現在の所有：%@";

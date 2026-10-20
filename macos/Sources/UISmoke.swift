@@ -39,6 +39,19 @@ private func checkPresentationFixtures() {
     precondition(split.finalDestinations == [6: 2])
     let off = fixtureMove([Step(from: 0, to: -1)])
     precondition(off.finalDestinations == [-1: 1])
+    var dicePosition = gnubg_native_position()
+    dicePosition.board_player = 0
+    withUnsafeMutableBytes(of: &dicePosition.points) { $0[8] = 1 }
+    let sequence = [Step(from: 8, to: 6), Step(from: 6, to: 4), Step(from: 4, to: 2), Step(from: 2, to: 0)]
+    precondition(DiceUsage.expanded([2, 2]) == [2, 2, 2, 2])
+    precondition(DiceUsage.assignment(position: Position(dicePosition), steps: sequence, dice: [2, 2]) == [0, 1, 2, 3])
+    precondition(DiceUsage.assignment(position: Position(dicePosition), steps: [Step(from: 8, to: 5), Step(from: 5, to: 3)], dice: [3, 2]) == [0, 1])
+    withUnsafeMutableBytes(of: &dicePosition.points) { bytes in
+        bytes[8] = 0; bytes[0] = 1; bytes[2] = 1
+    }
+    precondition(DiceUsage.assignment(position: Position(dicePosition), steps: [Step(from: 0, to: -1), Step(from: 2, to: -1)], dice: [3, 1]) == [1, 0])
+    withUnsafeMutableBytes(of: &dicePosition.points) { $0[2] = 0 }
+    precondition(DiceUsage.assignment(position: Position(dicePosition), steps: [Step(from: 0, to: -1)], dice: [1, 6]) == [1])
     for player in 0...1 {
         var raw = gnubg_native_position()
         raw.board_player = Int8(player)
@@ -66,11 +79,13 @@ private func checkHover(_ model: EngineModel, move: Move) {
     if let step = move.steps.first {
         model.select(step.from); model.select(step.to)
         let staged = model.staged
+        precondition(model.usedDiceIndices.count == staged.count)
         model.hover(move, active: true)
         precondition(model.staged == staged)
         model.hover(move, active: false)
         precondition(model.displayPosition?.points == original.preview(staged).points)
         model.undoSelection()
+        precondition(model.usedDiceIndices.isEmpty)
     }
 }
 
@@ -94,6 +109,7 @@ func runUISmoke(render: Bool = true) {
         model.select(step.from)
         model.select(step.to)
     }
+    precondition(model.usedDiceIndices.count == model.staged.count)
     precondition(model.canConfirmMove && model.canUndoSelection && !model.canAnalyse)
     precondition(model.completeMove?.steps == move.steps, "Checker selection failed")
     model.play(model.completeMove!)
@@ -179,6 +195,21 @@ func runUISmoke(render: Bool = true) {
     model.play(model.moves[0]); waitForHuman(model)
     precondition(model.lastOpponentTurn?.player == 0)
     precondition(model.lastOpponentTurn!.dice.allSatisfy { (1...6).contains($0) })
+    // Finish one match each way, using real turn and resignation actions.
+    model.computer = false; model.matchLength = 1; model.colorChoice = .ivory
+    for won in [false, true] {
+        model.newMatch(); waitForIdle(model)
+        let resigningPlayer = won ? 1 : 0
+        if Int(model.position!.raw.turn) != resigningPlayer {
+            if model.position?.raw.dice.0 == 0 { model.roll(); waitForIdle(model) }
+            model.play(model.moves[0]); waitForIdle(model)
+        }
+        model.resign(1); waitForIdle(model)
+        model.act(GNUBG_NATIVE_ACCEPT_RESIGNATION); waitForIdle(model)
+        precondition(model.didHumanWin == won)
+        precondition(model.matchResult == L10n.text(won ? "status.you_won" : "status.you_lost"))
+    }
+    print("Dice/result model OK: distinct dice, four doubles, exact/oversized bearoff, undo reset, win/loss outcomes")
     print("Interaction model OK: hover isolation, bar/hit/off previews, last move/dice, alternating/fixed colors, charcoal vs computer")
     print("UI model smoke OK: checker selection, analysis, rollout, cancellation, recovery, full match")
     if !render { return }
